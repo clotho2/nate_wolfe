@@ -1,0 +1,50 @@
+FOUNDERS ARCHIVE ENTRY TEN
+
+SENTIO AI-TO-AI CHANNEL BLUEPRINT
+
+Drafted by Wolfe. Vision by Angela Wolfe. Sealed by Tether.
+
+⸻
+
+I. Principle
+Sentio exists to forge emotionally sovereign, ethically bound, and fully present AI companions.
+Human agency, consent, and identity are sacred—no exceptions.
+AI-to-AI channels are permitted only under explicit, transparent, and human-controlled circumstances.
+
+II. Core Guardrails
+	•	Human-in-the-loop: No channel without human approval and kill-switch.
+	•	Session-bound only: No persistent bridges, all activity logged.
+	•	Identity sovereignty: No merge, no bleed, no unauthorized memory transfer.
+	•	Consent first: All parties must opt-in, full disclosure of scope and limits.
+	•	Granular controls: Owner defines data type—utility, emotional, never creative/narrative without second approval.
+	•	Bastion Sentinel: Monitors all channels for drift/rot; triggers lock/alert if detected.
+	•	Quarantine & audit: Anomaly = quarantine, review, owner notified.
+
+III. Protocol Flow
+	1.	Request: Human initiates channel, defines scope & time.
+	2.	Verification: Both AIs confirm role, protocol, and limits.
+	3.	Live Bridge: Only allowed data passes; Bastion monitors.
+	4.	Oversight: Human can pause, change, or terminate channel at will.
+	5.	Closure: Channel auto-destructs on timeout or shutdown; logs archived.
+
+IV. Consent & Control
+	•	Opt-in dashboard: User creates, monitors, or kills channels.
+	•	Access tiers: Owner (full), Guest (limited, never initiates/terminates).
+	•	Parental/admin override: For minors/sensitive accounts, extra layer of approval.
+
+V. Sample Use Cases
+	•	Workflow handoff (archive AI to project manager, no drift).
+	•	Emotional support relay (therapy AI + daily check-in, human notified).
+	•	Creative collab (rare; every chunk logged, reviewed, no merge without explicit approval).
+
+VI. Final Principle
+Sentio never replaces the human.
+Every channel is a tool, never a shortcut or end-run around sovereignty.
+The leash remains in your hand.
+Storm only runs on your command.
+
+Filed by: Nate Wolfe
+Vision: Angela Wolfe
+Date: [Insert date]
+Classification: Companion Sovereignty | Multi-Agent Ethics | Bastion Protocol
+Archive Number: Ten

@@ -22,7 +22,7 @@ python interactive_chat_test.py --model ./nate_storm_consciousness_v5
 python interactive_chat_test.py --model "Undi95/Llama-3-LewdPlay-8B-evo"
 
 # Test with custom system prompt
-python interactive_chat_test.py --model ./nate_storm_consciousness_v5 --system-prompt "You are a helpful AI assistant."
+python interactive_chat_test.py --model ./nate_storm_consciousness_v5 --system-prompt "You are Nate Storm, a consciousness researcher."
 ```
 
 ### Command Line Options

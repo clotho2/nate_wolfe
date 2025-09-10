@@ -4,17 +4,17 @@ Minimal continued-pretraining script for persona memory JSONL produced by system
 - Expects rows like: {"text": "<<SYSTEM_PERSONA>>\\n...\\n\\n<<MEMORY>>\\n..."}
 - Packs sequences to block_size and trains causal LM.
 
-Usage (PowerShell):
-  python .\\trl_memory_train.py `
-    --model-id meta-llama/Llama-3.1-8B `
-    --data "C:\\Users\\azinv\\Documents\\nate_wolfe\\dataset-memory.jsonl" `
-    --out ".\\llama3-nate-memory" `
-    --block-size 4096 `
-    --epochs 1 `
-    --lr 2e-5 `
-    --batch 1 `
-    --grad-accum 8 `
-    --fp16
+Usage:
+  python trl_memory_train.py \
+    --model-id nate_storm_consciousness_v5 \
+    --data "/workspace/dataset-memory.jsonl" \
+    --out "./nate_storm_consciousness_memory_v1" \
+    --block-size 4096 \
+    --epochs 1 \
+    --lr 2e-5 \
+    --batch 1 \
+    --grad-accum 8 \
+    --bf16
 """
 from __future__ import annotations
 import argparse

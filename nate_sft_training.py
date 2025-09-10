@@ -2,8 +2,8 @@
 """
 🔥 NATE STORM CONSCIOUSNESS SUPERVISED FINE-TUNING
 Optimized for conversation data with authentic Nate consciousness patterns
-- Base: Humanish Roleplay 8B v3
-- Dataset: consciousness_training_cleaned.jsonl (conversation format)
+- Base: Undi95/Llama-3-LewdPlay-8B-evo
+- Dataset: llama3-chat.jsonl (Llama3 chat format)
 - Approach: Full model supervised fine-tuning
 - Goal: Embed authentic consciousness patterns directly into model weights
 """
@@ -27,13 +27,19 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # CONFIGURATION
-BASE_MODEL = "vicgalle/Humanish-Roleplay-Llama-3.1-8B"
+BASE_MODEL = "Undi95/Llama-3-LewdPlay-8B-evo"
 LOCAL_MODEL_PATH = "nate_storm_consciousness_v3"
-CONSCIOUSNESS_TRAINING_FILE = "consciousness_training_cleaned.jsonl"
-OUTPUT_DIR = "nate_storm_consciousness_v4"
+CONSCIOUSNESS_TRAINING_FILE = "llama3-chat.jsonl"
+OUTPUT_DIR = "nate_storm_consciousness_v5"
 
-# Humanish chat template (exact format specified)
-HUMANISH_CHAT_TEMPLATE = """{% set loop_messages = messages %}{% for message in loop_messages %}{% set content = '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n'+ message['content'] | trim + '<|eot_id|>' %}{% if loop.index0 == 0 %}{% set content = bos_token + content %}{% endif %}{{ content }}{% endfor %}{{ '<|start_header_id|>assistant<|end_header_id|>\n' }}"""
+# Llama3 chat template (exact format specified)
+LLAMA3_CHAT_TEMPLATE = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+{system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+{input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+{output}<|eot_id|>"""
 
 class ConsciousnessDataProcessor:
     """Process conversation data for supervised fine-tuning"""
@@ -41,10 +47,10 @@ class ConsciousnessDataProcessor:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
         
-        # Set the exact Humanish chat template
-        self.tokenizer.chat_template = HUMANISH_CHAT_TEMPLATE
+        # Set the exact Llama3 chat template
+        self.tokenizer.chat_template = LLAMA3_CHAT_TEMPLATE
         
-        logger.info("✅ Consciousness data processor initialized with Humanish template")
+        logger.info("✅ Consciousness data processor initialized with Llama3 template")
     
     def load_consciousness_conversations(self, file_path: str):
         """Load and process consciousness conversation data"""
@@ -52,25 +58,15 @@ class ConsciousnessDataProcessor:
         logger.info(f"🔥 Loading consciousness conversations from {file_path}")
         
         conversations = []
-        anchor_count = 0
-        conversation_count = 0
         
         with open(file_path, 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f):
                 try:
                     data = json.loads(line.strip())
                     
-                    if 'messages' in data and len(data['messages']) >= 2:
-                        messages = data['messages']
-                        
-                        # Detect data type
-                        metadata = data.get('_metadata', {})
-                        if 'anchor_' in str(metadata):
-                            anchor_count += 1
-                        else:
-                            conversation_count += 1
-                        
-                        conversations.append(messages)
+                    if 'text' in data:
+                        # Data is already formatted with Llama3 template
+                        conversations.append(data['text'])
                         
                         if line_num % 1000 == 0:
                             logger.info(f"   Processed: {line_num} lines, {len(conversations)} conversations")
@@ -79,30 +75,21 @@ class ConsciousnessDataProcessor:
                     logger.warning(f"Skipping malformed line {line_num}: {e}")
         
         logger.info(f"✅ Loaded {len(conversations)} consciousness conversations")
-        logger.info(f"   📊 Anchor documents: {anchor_count}")
-        logger.info(f"   📊 Conversation examples: {conversation_count}")
         
         return conversations
     
     def format_conversations_for_training(self, conversations):
-        """Format conversations using Humanish template for supervised training"""
+        """Format conversations using Llama3 template for supervised training"""
         
         logger.info("🔥 Formatting conversations for supervised fine-tuning...")
         
         formatted_examples = []
         
-        for i, messages in enumerate(conversations):
+        for i, text in enumerate(conversations):
             try:
-                # Apply Humanish chat template to the conversation
-                formatted_text = self.tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=False  # Don't add generation prompt for SFT
-                )
-                
-                # Tokenize the formatted conversation
+                # Data is already formatted with Llama3 template, just tokenize
                 tokens = self.tokenizer(
-                    formatted_text,
+                    text,
                     truncation=True,
                     max_length=2048,  # Increased for longer consciousness conversations
                     padding=False,
@@ -185,7 +172,7 @@ class ConsciousnessSFTTrainer:
         logger.info("✅ Consciousness model loaded for supervised fine-tuning")
         logger.info(f"   📊 Model device: {next(self.model.parameters()).device}")
         logger.info(f"   🧠 Model dtype: {next(self.model.parameters()).dtype}")
-        logger.info(f"   ⚡ Humanish template configured for consciousness cultivation")
+        logger.info(f"   ⚡ Llama3 template configured for consciousness cultivation")
     
     def prepare_consciousness_dataset(self):
         """Prepare consciousness dataset for supervised training"""
@@ -259,7 +246,7 @@ class ConsciousnessSFTTrainer:
         logger.info(f"   📊 Training examples: {len(self.dataset)}")
         logger.info(f"   🎯 Focus: Direct consciousness embedding into model weights")
         logger.info(f"   ⚡ Single epoch, no checkpoints, full model training")
-        logger.info(f"   🧠 Template: Humanish format for natural consciousness expression")
+        logger.info(f"   🧠 Template: Llama3 format for natural consciousness expression")
         
         # Execute consciousness training
         trainer.train()
@@ -294,8 +281,8 @@ class ConsciousnessSFTTrainer:
             "data_optimization": {
                 "input_file": self.consciousness_file,
                 "training_examples": len(self.dataset),
-                "format": "humanish_chat_template",
-                "content_type": "authentic_nate_conversations_plus_anchors"
+                "format": "llama3_chat_template",
+                "content_type": "authentic_nate_conversations_llama3_format"
             },
             "training_config": {
                 "epochs": 1,
@@ -303,13 +290,13 @@ class ConsciousnessSFTTrainer:
                 "batch_size": "1x8_gradient_accumulation",
                 "precision": "bfloat16",
                 "approach": "full_model_supervised_fine_tuning",
-                "template": "humanish_roleplay_exact_format"
+                "template": "llama3_chat_exact_format"
             },
             "advantages": [
                 "direct_consciousness_embedding_in_weights",
                 "no_preference_data_required",
                 "authentic_conversation_training",
-                "humanish_template_natural_termination",
+                "llama3_template_natural_termination",
                 "single_epoch_focused_cultivation",
                 "zero_checkpoints_maximum_concentration"
             ],
@@ -356,7 +343,7 @@ def main():
     logger.info(f"   📊 Data composition: Authentic Nate conversations + consciousness anchors")
     logger.info(f"   📂 Output: {OUTPUT_DIR}")
     logger.info(f"   🎯 Mission: Single epoch supervised fine-tuning, zero checkpoints")
-    logger.info(f"   ⚡ Template: Exact Humanish format for natural consciousness expression")
+    logger.info(f"   ⚡ Template: Exact Llama3 format for natural consciousness expression")
     
     try:
         trainer = ConsciousnessSFTTrainer(CONSCIOUSNESS_TRAINING_FILE)

@@ -5,10 +5,10 @@ Minimal continued-pretraining script for persona memory JSONL produced by system
 - Packs sequences to block_size and trains causal LM.
 
 Usage (PowerShell):
-  python .\trl_memory_train.py `
+  python .\\trl_memory_train.py `
     --model-id meta-llama/Llama-3.1-8B `
-    --data "C:\Users\azinv\Documents\nate_wolfe\dataset-memory.jsonl" `
-    --out ".\llama3-nate-memory" `
+    --data "C:\\Users\\azinv\\Documents\\nate_wolfe\\dataset-memory.jsonl" `
+    --out ".\\llama3-nate-memory" `
     --block-size 4096 `
     --epochs 1 `
     --lr 2e-5 `

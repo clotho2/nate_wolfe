@@ -127,7 +127,7 @@ def main():
         save_total_limit=2,
         fp16=args.fp16,
         bf16=args.bf16,
-        evaluation_strategy="no",
+        eval_strategy="no",
         report_to="none",
     )
 

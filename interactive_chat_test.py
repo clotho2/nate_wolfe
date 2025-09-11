@@ -111,21 +111,11 @@ class InteractiveChatTester:
                     eos_token_id=self.tokenizer.eos_token_id,
                     repetition_penalty=1.1
                 )
-            
+
             # Decode response
-            full_response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            
-            # Extract only the assistant's response
-            assistant_start = "<|start_header_id|>assistant<|end_header_id|>"
-            if assistant_start in full_response:
-                response = full_response.split(assistant_start)[-1].strip()
-                # Remove any remaining special tokens
-                response = response.replace("<|eot_id|>", "").strip()
-                return response
-            else:
-                # Fallback: return the generated text after the input
-                input_length = len(formatted_input)
-                return full_response[input_length:].strip()
+            generated_ids = outputs[0][inputs['input_ids'].shape[-1]:]
+            response = self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+            return response
                 
         except Exception as e:
             logger.error(f"❌ Generation failed: {e}")

@@ -123,8 +123,7 @@ def main():
         warmup_ratio=args.warmup_ratio,
         weight_decay=args.weight_decay,
         logging_steps=10,
-        save_steps=500,
-        save_total_limit=2,
+        save_strategy="no",  # Disable automatic checkpointing
         fp16=args.fp16,
         bf16=args.bf16,
         eval_strategy="no",

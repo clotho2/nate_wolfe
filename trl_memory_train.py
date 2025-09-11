@@ -34,8 +34,8 @@ def parse_args():
     # Provide sensible defaults so the script can run without CLI args
     ap.add_argument(
         "--model-id",
-        default="sshleifer/tiny-gpt2",
-        help="Base model (default: sshleifer/tiny-gpt2 for quick smoke tests)",
+        default="nate_storm_consciousness_v5",
+        help="Base model (default: nate_storm_consciousness_v5)",
     )
     ap.add_argument(
         "--data",

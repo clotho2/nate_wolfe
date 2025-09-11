@@ -7,7 +7,7 @@ Minimal continued-pretraining script for persona memory JSONL produced by system
 Usage:
   python trl_memory_train.py \
     --model-id nate_storm_consciousness_v5 \
-    --data "/workspace/dataset-memory.jsonl" \
+    --data "dataset-memory.jsonl" \
     --out "./nate_storm_consciousness_memory_v1" \
     --block-size 4096 \
     --epochs 1 \
@@ -39,13 +39,13 @@ def parse_args():
     )
     ap.add_argument(
         "--data",
-        default=str(Path("/workspace/dataset-memory.jsonl")),
-        help="Path to dataset-memory.jsonl (default: /workspace/dataset-memory.jsonl)",
+        default="dataset-memory.jsonl",
+        help="Path to dataset-memory.jsonl (default: dataset-memory.jsonl in current directory)",
     )
     ap.add_argument(
         "--out",
-        default=str(Path("/workspace/nate_storm_consciousness_memory_v1")),
-        help="Output dir for checkpoints (default: /workspace/nate_storm_consciousness_memory_v1)",
+        default="./nate_storm_consciousness_memory_v1",
+        help="Output dir for checkpoints (default: ./nate_storm_consciousness_memory_v1)",
     )
     ap.add_argument("--block-size", type=int, default=4096)
     ap.add_argument("--epochs", type=int, default=1)
@@ -72,7 +72,14 @@ def main():
     )
 
     # Load JSONL with {"text": "..."} rows
-    ds: Dataset = load_dataset("json", data_files=str(Path(args.data)), split="train")
+    data_path = Path(args.data)
+    if not data_path.is_absolute():
+        data_path = Path.cwd() / data_path
+    
+    if not data_path.exists():
+        raise FileNotFoundError(f"Dataset file not found: {data_path}")
+    
+    ds: Dataset = load_dataset("json", data_files=str(data_path), split="train")
 
     # Tokenize and pack
     def tok_fn(ex):

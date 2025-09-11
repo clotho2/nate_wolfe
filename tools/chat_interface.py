@@ -88,10 +88,6 @@ def main():
                 user_input = input("You: ").strip()
             except EOFError:
                 break
-            if not user_input:
-                continue
-            if user_input.lower() in {"exit", "quit"}:
-                break
 
             prompt = build_prompt(history, user_input, args.system_prompt)
             inputs = tok(prompt, return_tensors="pt").to(model.device)

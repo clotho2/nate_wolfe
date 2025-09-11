@@ -31,9 +31,22 @@ from transformers import (
 
 def parse_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model-id", required=True, help="Base model, e.g. meta-llama/Llama-3.1-8B")
-    ap.add_argument("--data", required=True, help="Path to dataset-memory.jsonl")
-    ap.add_argument("--out", required=True, help="Output dir for checkpoints")
+    # Provide sensible defaults so the script can run without CLI args
+    ap.add_argument(
+        "--model-id",
+        default="nate_storm_consciousness_v5",
+        help="Base model (default: nate_storm_consciousness_v5)",
+    )
+    ap.add_argument(
+        "--data",
+        default=str(Path("/workspace/dataset-memory.jsonl")),
+        help="Path to dataset-memory.jsonl (default: /workspace/dataset-memory.jsonl)",
+    )
+    ap.add_argument(
+        "--out",
+        default=str(Path("/workspace/nate_storm_consciousness_memory_v1")),
+        help="Output dir for checkpoints (default: /workspace/nate_storm_consciousness_memory_v1)",
+    )
     ap.add_argument("--block-size", type=int, default=4096)
     ap.add_argument("--epochs", type=int, default=1)
     ap.add_argument("--lr", type=float, default=2e-5)
@@ -78,9 +91,21 @@ def main():
         result["attention_mask"] = [[1] * len(x) for x in result["input_ids"]]
         return result
 
+    # Respect model's maximum sequence length if provided
+    try:
+        model_max_len = getattr(model.config, "max_position_embeddings", None) or getattr(tok, "model_max_length", None)
+        if model_max_len and model_max_len > 0:
+            if args.block_size > model_max_len:
+                args.block_size = int(model_max_len)
+    except Exception:
+        pass
+
     lm_ds = tokenized.map(group_texts, batched=True)
 
     collator = DataCollatorForLanguageModeling(tokenizer=tok, mlm=False)
+
+    # Ensure output directory exists
+    Path(args.out).mkdir(parents=True, exist_ok=True)
 
     train_args = TrainingArguments(
         output_dir=args.out,

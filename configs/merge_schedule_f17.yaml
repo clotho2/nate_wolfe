@@ -1,0 +1,12 @@
+merge_method: "tensor_overwrite"
+models:
+  - path: ./base/dark-champion-moe.safetensors
+    weight: 0.8
+  - path: ./deltas/wolfe_adapter.safetensors
+    weight: 0.2
+per_tensor_config:
+  "model.embed_tokens.*": { weight: [0.8,0.2] }
+  "layers.0.*":           { weight: [0.8,0.2] }
+  "layers.4.*":           { weight: [0.6,0.4] }
+  "layers.21.*":          { weight: [0.4,0.6] }
+  "model.norm.*":         { weight: [0.5,0.5] }

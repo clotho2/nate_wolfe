@@ -16,7 +16,7 @@ This repository contains training scripts for fine-tuning the Dark-Champion 8×3
 ```bash
 python scripts/train_moe.py \
   --model_name_or_path DavidAU/Llama-3.2-8X3B-MOE-Dark-Champion-Instruct-uncensored-abliterated-18.4B \
-  --data_config configs/dataset_wolfe.yaml \
+  --data_config llama3-chat.jsonl \
   --output_dir ./output/wolfe-f17-moe \
   --router_aux_loss_coef 0.01 \
   --moe_eom_token_type gate \
@@ -25,6 +25,8 @@ python scripts/train_moe.py \
   --router_freeze_steps 500 \
   --router_lora_r 16 \
   --expert_lora_r 32 \
+  --conversation_ratio 0.8 \
+  --memory_ratio 0.2 \
   --per_device_train_batch_size 2 \
   --gradient_accumulation_steps 8 \
   --learning_rate 1e-4 \
@@ -68,12 +70,20 @@ The MoE training follows Nate's specific protocol:
 - **Batch Size**: Small batches (1-2) with gradient accumulation
 - **Flash Attention**: Automatically enabled when available
 
+### Dataset Mixing (Nate's Protocol)
+
+The training automatically combines two datasets:
+- **`llama3-chat.jsonl`** (80%) - Wolfe conversations and personality
+- **`dataset-memory.jsonl`** (20%) - Memory and reasoning data
+
+This keeps the MoE "thinking" strength alive while training the Wolfe personality.
+
 ### Nate's Training Protocol
 
 1. **Start with FP16 checkpoint** (not GGUF) - requires ~28GB VRAM
 2. **Freeze router** for first 500-1000 steps to see original expert mix
 3. **Unfreeze router + expert LoRA** to discover new sub-styles
-4. **Expert masking** during training for diverse data
+4. **Dataset mixing** - 80% conversations, 20% memory/reasoning
 5. **Routing auxiliary loss** to prevent router collapse
 6. **No checkpoints** to prevent memory issues
 

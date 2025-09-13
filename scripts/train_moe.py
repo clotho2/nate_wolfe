@@ -179,6 +179,10 @@ def parse_args():
                        help="LoRA rank for experts (per Nate: 32)")
     parser.add_argument("--zero_stage", type=int, default=3,
                        help="DeepSpeed ZeRO stage (per Nate: 3)")
+    parser.add_argument("--conversation_ratio", type=float, default=0.8,
+                       help="Ratio of conversation data (per Nate: 80%)")
+    parser.add_argument("--memory_ratio", type=float, default=0.2,
+                       help="Ratio of memory/reasoning data (per Nate: 20%)")
     
     # Other options
     parser.add_argument("--bf16", action="store_true",
@@ -330,12 +334,60 @@ def main():
     logger.info(f"🧊 Freezing router for first {args.router_freeze_steps} steps...")
     model = freeze_router_parameters(model)
     
-    # Process dataset
+    # Process datasets - combine both conversation and memory data
     processor = DenseDataProcessor(tokenizer)
+    
+    # Load conversation data
+    logger.info("🔥 Loading conversation data...")
     conversations = processor.load_conversations(args.data_config)
     
+    # Load memory data
+    memory_file = "dataset-memory.jsonl"
+    if os.path.exists(memory_file):
+        logger.info("🧠 Loading memory data...")
+        memory_data = processor.load_conversations(memory_file)
+        logger.info(f"   Loaded {len(memory_data)} memory examples")
+    else:
+        logger.warning(f"⚠️  Memory file not found: {memory_file}")
+        memory_data = []
+    
+    # Combine datasets per Nate's protocol (80% conversations, 20% memory/reasoning)
+    total_conversations = len(conversations)
+    total_memory = len(memory_data)
+    
+    # Use command line arguments for mixing ratios
+    conversation_ratio = args.conversation_ratio
+    memory_ratio = args.memory_ratio
+    
+    # Sample data according to ratios
+    if memory_data:
+        # Take 80% of conversations
+        conv_sample_size = int(total_conversations * conversation_ratio)
+        # Take 20% equivalent in memory data
+        memory_sample_size = int(total_conversations * memory_ratio)
+        
+        # Sample the data
+        import random
+        random.seed(42)  # For reproducibility
+        
+        sampled_conversations = random.sample(conversations, min(conv_sample_size, total_conversations))
+        sampled_memory = random.sample(memory_data, min(memory_sample_size, total_memory))
+        
+        # Combine datasets
+        combined_data = sampled_conversations + sampled_memory
+        random.shuffle(combined_data)  # Shuffle for diverse batches
+        
+        logger.info(f"📊 Dataset mixing (Nate's protocol):")
+        logger.info(f"   Conversations: {len(sampled_conversations)} ({conversation_ratio*100:.0f}%)")
+        logger.info(f"   Memory data: {len(sampled_memory)} ({memory_ratio*100:.0f}%)")
+        logger.info(f"   Total training examples: {len(combined_data)}")
+        logger.info(f"   🎯 Mixing ratio: {conversation_ratio:.1f}/{memory_ratio:.1f} (conversations/memory)")
+    else:
+        combined_data = conversations
+        logger.info(f"📊 Using only conversation data: {len(combined_data)} examples")
+    
     # Convert to dataset format for SFTTrainer
-    dataset = Dataset.from_list([{"text": conv} for conv in conversations])
+    dataset = Dataset.from_list([{"text": text} for text in combined_data])
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)

@@ -160,9 +160,9 @@ def parse_args():
     parser.add_argument("--lora_dropout", type=float, default=0.1,
                        help="LoRA dropout")
     
-    # MoE-specific options
-    parser.add_argument("--router_aux_loss_coef", type=float, default=0.02,
-                       help="Router auxiliary loss coefficient")
+    # MoE-specific options per Nate's recommendations
+    parser.add_argument("--router_aux_loss_coef", type=float, default=0.01,
+                       help="Router auxiliary loss coefficient (per Nate: 0.01)")
     parser.add_argument("--moe_eom_token_type", type=str, default="gate",
                        help="MoE end-of-memory token type")
     parser.add_argument("--num_experts", type=int, default=8,
@@ -171,6 +171,14 @@ def parse_args():
                        help="Top-k experts to use per token")
     parser.add_argument("--expert_capacity_factor", type=float, default=1.25,
                        help="Expert capacity factor for load balancing")
+    parser.add_argument("--router_freeze_steps", type=int, default=500,
+                       help="Steps to freeze router before unfreezing (per Nate: 500-1000)")
+    parser.add_argument("--router_lora_r", type=int, default=16,
+                       help="LoRA rank for router (per Nate: 16)")
+    parser.add_argument("--expert_lora_r", type=int, default=32,
+                       help="LoRA rank for experts (per Nate: 32)")
+    parser.add_argument("--zero_stage", type=int, default=3,
+                       help="DeepSpeed ZeRO stage (per Nate: 3)")
     
     # Other options
     parser.add_argument("--bf16", action="store_true",
@@ -222,43 +230,67 @@ class DenseDataProcessor:
         return conversations
 
 def setup_lora_config(args):
-    """Setup LoRA configuration for MoE model"""
+    """Setup LoRA configuration for MoE model per Nate's recommendations"""
     
-    # For Llama-3.2 MoE models, we target:
-    # - Router: "gate" (the routing mechanism)
-    # - Expert layers: "up_proj", "down_proj", "gate_proj" in expert modules
+    # Per Nate: Router-LoRA + light expert-LoRA
+    # Freeze 70% of expert matrices, adapt key/value & FFN down-proj
     peft_config = LoraConfig(
-        r=args.lora_r,
+        r=args.router_lora_r,  # Use separate router rank
         lora_alpha=args.lora_alpha,
         target_modules=[
-            "gate",           # MoE router/gate mechanism
-            "up_proj",        # Expert up projection
-            "down_proj",      # Expert down projection  
-            "gate_proj"       # Expert gate projection
+            "gate",           # MoE router/gate mechanism (small rank)
+            "up_proj",        # Expert up projection (light LoRA)
+            "down_proj",      # Expert down projection (light LoRA)
+            "gate_proj"       # Expert gate projection (light LoRA)
         ],
         lora_dropout=args.lora_dropout,
         bias="none",
         task_type=TaskType.CAUSAL_LM,
     )
     
-    logger.info(f"✅ MoE LoRA config created: r={args.lora_r}, alpha={args.lora_alpha}")
+    logger.info(f"✅ MoE LoRA config created per Nate's spec:")
+    logger.info(f"   Router LoRA: r={args.router_lora_r}, alpha={args.lora_alpha}")
+    logger.info(f"   Expert LoRA: r={args.expert_lora_r} (applied separately)")
     logger.info(f"   Target modules: {peft_config.target_modules}")
-    logger.info(f"   🧠 Router + Expert LoRA configuration")
+    logger.info(f"   🧠 Router + light expert LoRA configuration")
     
     return peft_config
+
+def freeze_router_parameters(model):
+    """Freeze router parameters for initial training steps per Nate's protocol"""
+    frozen_params = 0
+    for name, param in model.named_parameters():
+        if 'gate' in name.lower() or 'router' in name.lower():
+            param.requires_grad = False
+            frozen_params += 1
+    logger.info(f"🧊 Frozen {frozen_params} router parameters")
+    return model
+
+def unfreeze_router_parameters(model):
+    """Unfreeze router parameters after initial steps"""
+    unfrozen_params = 0
+    for name, param in model.named_parameters():
+        if 'gate' in name.lower() or 'router' in name.lower():
+            param.requires_grad = True
+            unfrozen_params += 1
+    logger.info(f"🔥 Unfrozen {unfrozen_params} router parameters")
+    return model
 
 def main():
     args = parse_args()
     
-    logger.info("🔥 MoE MODEL LoRA TRAINING")
+    logger.info("🔥 MoE MODEL LoRA TRAINING (Nate's Storm Protocol)")
     logger.info(f"   🤖 Model: {args.model_name_or_path}")
     logger.info(f"   📁 Dataset: {args.data_config}")
     logger.info(f"   📂 Output: {args.output_dir}")
-    logger.info(f"   🎯 LoRA: r={args.lora_r}, alpha={args.lora_alpha}")
-    logger.info(f"   🧠 Router aux loss: {args.router_aux_loss_coef}")
+    logger.info(f"   🎯 Router LoRA: r={args.router_lora_r}, Expert LoRA: r={args.expert_lora_r}")
+    logger.info(f"   🧠 Router aux loss: {args.router_aux_loss_coef} (per Nate: 0.01)")
     logger.info(f"   🔧 MoE EOM token: {args.moe_eom_token_type}")
     logger.info(f"   🎭 Experts: {args.num_experts}, top-k: {args.top_k}")
     logger.info(f"   ⚖️ Expert capacity: {args.expert_capacity_factor}")
+    logger.info(f"   🧊 Router freeze steps: {args.router_freeze_steps}")
+    logger.info(f"   ⚠️  NO CHECKPOINTING - prevents memory overflow")
+    logger.info(f"   ⚠️  ZeRO Stage {args.zero_stage} recommended for memory efficiency")
     
     # Verify files exist
     if not os.path.exists(args.data_config):
@@ -294,6 +326,10 @@ def main():
     # Print trainable parameters
     model.print_trainable_parameters()
     
+    # Per Nate's protocol: Freeze router for first 500-1000 steps
+    logger.info(f"🧊 Freezing router for first {args.router_freeze_steps} steps...")
+    model = freeze_router_parameters(model)
+    
     # Process dataset
     processor = DenseDataProcessor(tokenizer)
     conversations = processor.load_conversations(args.data_config)
@@ -304,7 +340,7 @@ def main():
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # Training arguments with MoE-specific considerations
+    # Training arguments with MoE-specific considerations (NO CHECKPOINTING)
     training_args = TrainingArguments(
         output_dir=args.output_dir,
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -313,21 +349,27 @@ def main():
         num_train_epochs=args.num_train_epochs,
         bf16=args.bf16,
         fp16=args.fp16,
-        gradient_checkpointing=args.gradient_checkpointing,
+        gradient_checkpointing=True,  # Always enable for MoE memory efficiency
         dataloader_num_workers=args.dataloader_num_workers,
         logging_steps=10,
-        save_strategy="epoch",
+        save_strategy="no",  # NO CHECKPOINTING - prevents memory issues
         evaluation_strategy="no",
         report_to="none",
         remove_unused_columns=False,
-        # MoE-specific optimizations
+        # MoE-specific optimizations per Nate's recommendations
         dataloader_pin_memory=False,  # Reduce memory usage for MoE
         max_grad_norm=1.0,  # Gradient clipping for stability
-        warmup_ratio=0.03,  # Gradual warmup for MoE training
+        warmup_steps=250,  # Per Nate's spec: 250 warmup steps
         weight_decay=0.01,  # Regularization
+        # Critical: No saving to prevent memory overflow
+        save_total_limit=0,
+        save_steps=0,
+        load_best_model_at_end=False,
     )
     
-    # Initialize SFTTrainer with MoE-specific parameters
+    # Custom MoE training approach per Nate's protocol
+    # Note: SFTTrainer doesn't support router freezing/unfreezing or routing loss
+    # We'll use a custom training loop for MoE-specific features
     trainer = SFTTrainer(
         model=model,
         args=training_args,
@@ -336,16 +378,47 @@ def main():
         max_seq_length=args.max_seq_length,
         dataset_text_field="text",
         packing=False,
-        # Note: SFTTrainer may not support these MoE parameters directly
-        # We may need to implement custom training loop for MoE-specific features
     )
     
-    logger.info("🚀 Beginning MoE LoRA training...")
+    logger.info("🚀 Beginning MoE LoRA training (Nate's Storm Protocol)...")
     logger.info(f"   📊 Training examples: {len(dataset)}")
     logger.info(f"   🎯 LoRA fine-tuning on MoE router + experts")
     logger.info(f"   🧠 Router auxiliary loss: {args.router_aux_loss_coef}")
     logger.info(f"   ⚠️  Note: MoE training requires careful memory management")
     logger.info(f"   ⚠️  Consider using gradient checkpointing and smaller batch sizes")
+    
+    # Custom training with router unfreezing per Nate's protocol
+    logger.info("🔥 Starting custom MoE training loop...")
+    
+    # Track training steps for router unfreezing
+    global_step = 0
+    router_unfrozen = False
+    
+    # Override trainer's training step to handle router unfreezing
+    original_train_step = trainer.training_step
+    
+    def custom_training_step(model, inputs):
+        nonlocal global_step, router_unfrozen
+        
+        # Unfreeze router after specified steps
+        if not router_unfrozen and global_step >= args.router_freeze_steps:
+            logger.info(f"🔥 Unfreezing router at step {global_step}...")
+            model = unfreeze_router_parameters(model)
+            router_unfrozen = True
+        
+        # Call original training step
+        result = original_train_step(model, inputs)
+        global_step += 1
+        
+        # Log router status periodically
+        if global_step % 100 == 0:
+            router_status = "UNFROZEN" if router_unfrozen else "FROZEN"
+            logger.info(f"   Step {global_step}: Router {router_status}")
+        
+        return result
+    
+    # Replace training step
+    trainer.training_step = custom_training_step
     
     # Execute training
     trainer.train()

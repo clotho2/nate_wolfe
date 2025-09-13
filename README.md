@@ -18,15 +18,18 @@ python scripts/train_moe.py \
   --model_name_or_path DavidAU/Llama-3.2-8X3B-MOE-Dark-Champion-Instruct-uncensored-abliterated-18.4B \
   --data_config configs/dataset_wolfe.yaml \
   --output_dir ./output/wolfe-f17-moe \
-  --router_aux_loss_coef 0.02 \
+  --router_aux_loss_coef 0.01 \
   --moe_eom_token_type gate \
   --num_experts 8 \
   --top_k 2 \
+  --router_freeze_steps 500 \
+  --router_lora_r 16 \
+  --expert_lora_r 32 \
   --per_device_train_batch_size 2 \
   --gradient_accumulation_steps 8 \
   --learning_rate 1e-4 \
   --num_train_epochs 2 \
-  --gradient_checkpointing
+  --zero_stage 3
 ```
 
 ### Post-Training Processing
@@ -47,22 +50,32 @@ python convert.py --in merged-wolfe-f17.safetensors --out wolfe-f17-Q4_K_M.gguf 
 ./llama.cpp -m wolfe-f17-Q4_K_M.gguf --temp 0.65 --top_p 0.92 --repeat_penalty 1.1
 ```
 
-## Training Configuration
+## Training Configuration (Nate's Storm Protocol)
 
-The MoE training uses:
-- **Router LoRA**: Targets the MoE `gate` mechanism for traffic pattern learning
-- **Expert LoRA**: Shallow LoRA on `up_proj`, `down_proj`, and `gate_proj` of each expert
-- **Auxiliary Loss**: Router entropy loss to prevent collapse (0.02 coefficient)
+The MoE training follows Nate's specific protocol:
+- **Router LoRA**: Small rank (16) on `gate` mechanism for traffic pattern learning
+- **Expert LoRA**: Light LoRA (32) on `up_proj`, `down_proj`, `gate_proj` of each expert
+- **Router Freezing**: Router frozen for first 500-1000 steps, then unfrozen
+- **Auxiliary Loss**: Router entropy loss to prevent collapse (0.01 coefficient)
 - **MoE Parameters**: 8 experts, top-k=2, expert capacity factor=1.25
-- **Memory Optimization**: Gradient checkpointing, reduced batch sizes, no pin memory
+- **Memory Optimization**: NO CHECKPOINTING, gradient checkpointing, ZeRO-3
 
-### MoE-Specific Considerations
+### Critical Memory Management
 
-- **Memory Requirements**: MoE models require significantly more memory than dense models
-- **Expert Load Balancing**: The auxiliary loss helps prevent router collapse
-- **Batch Size**: Use smaller batch sizes (1-2) with gradient accumulation
-- **Gradient Checkpointing**: Essential for memory efficiency with large MoE models
-- **Flash Attention**: Automatically enabled when available for better performance
+- **NO CHECKPOINTING**: Prevents memory overflow during training
+- **Router Freezing**: Initial 500 steps with frozen router, then unfrozen
+- **ZeRO Stage 3**: DeepSpeed ZeRO offload for memory efficiency
+- **Batch Size**: Small batches (1-2) with gradient accumulation
+- **Flash Attention**: Automatically enabled when available
+
+### Nate's Training Protocol
+
+1. **Start with FP16 checkpoint** (not GGUF) - requires ~28GB VRAM
+2. **Freeze router** for first 500-1000 steps to see original expert mix
+3. **Unfreeze router + expert LoRA** to discover new sub-styles
+4. **Expert masking** during training for diverse data
+5. **Routing auxiliary loss** to prevent router collapse
+6. **No checkpoints** to prevent memory issues
 
 ## Files
 

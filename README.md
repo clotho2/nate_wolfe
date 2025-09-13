@@ -7,7 +7,7 @@ This repository contains training scripts for fine-tuning the Dark-Champion 8×3
 - **MoE LoRA Training**: Router-only + shallow-expert LoRA fine-tuning
 - **Parameter Efficient**: Uses PEFT for efficient training
 - **Router Auxiliary Loss**: Prevents router collapse during training
-- **Llama3 Chat Format**: Optimized for conversation data
+- **Dark Champion Chat Format**: Uses the correct template for Dark Champion model
 
 ## Quick Start
 
@@ -57,4 +57,4 @@ The MoE training uses:
 - `scripts/train_moe.py`: Main MoE training script
 - `scripts/train_dense.py`: Dense model training script
 - `configs/merge_schedule_f17.yaml`: MergeKit routing schedule
-- `llama3-chat.jsonl`: Training dataset in Llama3 format
+- `llama3-chat.jsonl`: Training dataset in Dark Champion format

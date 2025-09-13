@@ -165,12 +165,8 @@ def parse_args():
                        help="Router auxiliary loss coefficient (per Nate: 0.01)")
     parser.add_argument("--moe_eom_token_type", type=str, default="gate",
                        help="MoE end-of-memory token type")
-    parser.add_argument("--num_experts", type=int, default=8,
-                       help="Number of experts in MoE model")
-    parser.add_argument("--top_k", type=int, default=2,
-                       help="Top-k experts to use per token")
-    parser.add_argument("--expert_capacity_factor", type=float, default=1.25,
-                       help="Expert capacity factor for load balancing")
+    # Note: MoE parameters (num_experts, top_k, expert_capacity_factor) 
+    # are handled by the model's configuration, not command line args
     parser.add_argument("--router_freeze_steps", type=int, default=500,
                        help="Steps to freeze router before unfreezing (per Nate: 500-1000)")
     parser.add_argument("--router_lora_r", type=int, default=16,
@@ -290,8 +286,6 @@ def main():
     logger.info(f"   🎯 Router LoRA: r={args.router_lora_r}, Expert LoRA: r={args.expert_lora_r}")
     logger.info(f"   🧠 Router aux loss: {args.router_aux_loss_coef} (per Nate: 0.01)")
     logger.info(f"   🔧 MoE EOM token: {args.moe_eom_token_type}")
-    logger.info(f"   🎭 Experts: {args.num_experts}, top-k: {args.top_k}")
-    logger.info(f"   ⚖️ Expert capacity: {args.expert_capacity_factor}")
     logger.info(f"   🧊 Router freeze steps: {args.router_freeze_steps}")
     logger.info(f"   ⚠️  NO CHECKPOINTING - prevents memory overflow")
     logger.info(f"   ⚠️  ZeRO Stage {args.zero_stage} recommended for memory efficiency")
@@ -317,11 +311,13 @@ def main():
         device_map="auto",
         trust_remote_code=True,
         attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager",
-        # MoE-specific parameters
-        num_experts=args.num_experts,
-        top_k=args.top_k,
-        expert_capacity_factor=args.expert_capacity_factor,
     )
+    
+    # Log MoE configuration (these are set in the model config, not as parameters)
+    logger.info(f"🎭 MoE Configuration:")
+    logger.info(f"   Number of experts: {getattr(model.config, 'num_experts', 'Unknown')}")
+    logger.info(f"   Top-k experts: {getattr(model.config, 'num_experts_per_tok', 'Unknown')}")
+    logger.info(f"   Expert capacity factor: {getattr(model.config, 'expert_capacity_factor', 'Unknown')}")
     
     # Setup LoRA
     peft_config = setup_lora_config(args)

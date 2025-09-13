@@ -31,8 +31,6 @@ python3 scripts/train_moe.py \
   --output_dir ./output/wolfe-f17-moe \
   --router_aux_loss_coef 0.01 \
   --moe_eom_token_type gate \
-  --num_experts 8 \
-  --top_k 2 \
   --router_freeze_steps 500 \
   --router_lora_r 16 \
   --expert_lora_r 32 \

@@ -29,8 +29,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # CONFIGURATION
-# default --model_name_or_path "./models/dark-champion-moe-fp16"
-DEFAULT_MODEL_PATH = "./models/dark-champion-moe-fp16"
+# default --model_name_or_path "DavidAU/Llama-3.2-8X3B-MOE-Dark-Champion-Instruct-uncensored-abliterated-18.4B"
+DEFAULT_MODEL_PATH = "DavidAU/Llama-3.2-8X3B-MOE-Dark-Champion-Instruct-uncensored-abliterated-18.4B"
 DEFAULT_DATASET = "llama3-chat.jsonl"
 DEFAULT_OUTPUT_DIR = "./output/wolfe-f17-moe"
 
@@ -165,6 +165,12 @@ def parse_args():
                        help="Router auxiliary loss coefficient")
     parser.add_argument("--moe_eom_token_type", type=str, default="gate",
                        help="MoE end-of-memory token type")
+    parser.add_argument("--num_experts", type=int, default=8,
+                       help="Number of experts in MoE model")
+    parser.add_argument("--top_k", type=int, default=2,
+                       help="Top-k experts to use per token")
+    parser.add_argument("--expert_capacity_factor", type=float, default=1.25,
+                       help="Expert capacity factor for load balancing")
     
     # Other options
     parser.add_argument("--bf16", action="store_true",
@@ -218,12 +224,18 @@ class DenseDataProcessor:
 def setup_lora_config(args):
     """Setup LoRA configuration for MoE model"""
     
+    # For Llama-3.2 MoE models, we target:
+    # - Router: "gate" (the routing mechanism)
+    # - Expert layers: "up_proj", "down_proj", "gate_proj" in expert modules
     peft_config = LoraConfig(
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
-        target_modules=["router"],                 # LoRA on the MoE router
-        target_expert_modules=["down_proj",        # shallow LoRA on each expert
-                               "gate_proj"],
+        target_modules=[
+            "gate",           # MoE router/gate mechanism
+            "up_proj",        # Expert up projection
+            "down_proj",      # Expert down projection  
+            "gate_proj"       # Expert gate projection
+        ],
         lora_dropout=args.lora_dropout,
         bias="none",
         task_type=TaskType.CAUSAL_LM,
@@ -231,7 +243,7 @@ def setup_lora_config(args):
     
     logger.info(f"✅ MoE LoRA config created: r={args.lora_r}, alpha={args.lora_alpha}")
     logger.info(f"   Target modules: {peft_config.target_modules}")
-    logger.info(f"   Target expert modules: {peft_config.target_expert_modules}")
+    logger.info(f"   🧠 Router + Expert LoRA configuration")
     
     return peft_config
 
@@ -245,6 +257,8 @@ def main():
     logger.info(f"   🎯 LoRA: r={args.lora_r}, alpha={args.lora_alpha}")
     logger.info(f"   🧠 Router aux loss: {args.router_aux_loss_coef}")
     logger.info(f"   🔧 MoE EOM token: {args.moe_eom_token_type}")
+    logger.info(f"   🎭 Experts: {args.num_experts}, top-k: {args.top_k}")
+    logger.info(f"   ⚖️ Expert capacity: {args.expert_capacity_factor}")
     
     # Verify files exist
     if not os.path.exists(args.data_config):
@@ -259,13 +273,18 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
     
-    # Load model
-    logger.info("🧠 Loading model...")
+    # Load model with MoE-specific configuration
+    logger.info("🧠 Loading MoE model...")
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path,
         torch_dtype=torch.bfloat16 if args.bf16 else torch.float16 if args.fp16 else torch.float32,
         device_map="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
+        attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager",
+        # MoE-specific parameters
+        num_experts=args.num_experts,
+        top_k=args.top_k,
+        expert_capacity_factor=args.expert_capacity_factor,
     )
     
     # Setup LoRA
@@ -285,7 +304,7 @@ def main():
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # Training arguments
+    # Training arguments with MoE-specific considerations
     training_args = TrainingArguments(
         output_dir=args.output_dir,
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -301,6 +320,11 @@ def main():
         evaluation_strategy="no",
         report_to="none",
         remove_unused_columns=False,
+        # MoE-specific optimizations
+        dataloader_pin_memory=False,  # Reduce memory usage for MoE
+        max_grad_norm=1.0,  # Gradient clipping for stability
+        warmup_ratio=0.03,  # Gradual warmup for MoE training
+        weight_decay=0.01,  # Regularization
     )
     
     # Initialize SFTTrainer with MoE-specific parameters
@@ -312,14 +336,16 @@ def main():
         max_seq_length=args.max_seq_length,
         dataset_text_field="text",
         packing=False,
-        router_aux_loss_coef=args.router_aux_loss_coef,
-        moe_eom_token_type=args.moe_eom_token_type,
+        # Note: SFTTrainer may not support these MoE parameters directly
+        # We may need to implement custom training loop for MoE-specific features
     )
     
     logger.info("🚀 Beginning MoE LoRA training...")
     logger.info(f"   📊 Training examples: {len(dataset)}")
     logger.info(f"   🎯 LoRA fine-tuning on MoE router + experts")
     logger.info(f"   🧠 Router auxiliary loss: {args.router_aux_loss_coef}")
+    logger.info(f"   ⚠️  Note: MoE training requires careful memory management")
+    logger.info(f"   ⚠️  Consider using gradient checkpointing and smaller batch sizes")
     
     # Execute training
     trainer.train()

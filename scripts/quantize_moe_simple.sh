@@ -42,22 +42,48 @@ command_exists() {
 install_llama_cpp() {
     print_info "Installing llama.cpp..."
     
-    # Clone llama.cpp if it doesn't exist
+    # Check if we're in the right directory
     if [ ! -d "llama.cpp" ]; then
+        print_info "Cloning llama.cpp..."
         git clone https://github.com/ggerganov/llama.cpp.git
     fi
     
     cd llama.cpp
     
     # Build llama.cpp
+    print_info "Building llama.cpp..."
     make -j$(nproc)
     
     # Install Python bindings
+    print_info "Installing Python bindings..."
     pip install llama-cpp-python
     
     cd ..
     
     print_success "llama.cpp installed successfully"
+}
+
+# Function to find llama.cpp tools
+find_llama_tools() {
+    # Check if llama-convert and llama-quantize are in PATH
+    if command_exists llama-convert && command_exists llama-quantize; then
+        print_success "Found llama.cpp tools in PATH"
+        return 0
+    fi
+    
+    # Check if they're in the current directory
+    if [ -f "./llama-convert" ] && [ -f "./llama-quantize" ]; then
+        print_success "Found llama.cpp tools in current directory"
+        return 0
+    fi
+    
+    # Check if they're in llama.cpp directory
+    if [ -f "./llama.cpp/llama-convert" ] && [ -f "./llama.cpp/llama-quantize" ]; then
+        print_success "Found llama.cpp tools in llama.cpp directory"
+        return 0
+    fi
+    
+    return 1
 }
 
 # Function to convert model to GGUF
@@ -67,8 +93,21 @@ convert_to_gguf() {
     
     print_info "Converting model to GGUF format..."
     
+    # Find the correct llama-convert path
+    local convert_cmd=""
+    if command_exists llama-convert; then
+        convert_cmd="llama-convert"
+    elif [ -f "./llama-convert" ]; then
+        convert_cmd="./llama-convert"
+    elif [ -f "./llama.cpp/llama-convert" ]; then
+        convert_cmd="./llama.cpp/llama-convert"
+    else
+        print_error "llama-convert not found!"
+        return 1
+    fi
+    
     # Use llama.cpp convert script
-    llama-convert \
+    $convert_cmd \
         "$model_path" \
         --outfile "$output_path" \
         --outtype f16
@@ -84,8 +123,21 @@ quantize_model() {
     
     print_info "Quantizing to $quant_type..."
     
+    # Find the correct llama-quantize path
+    local quantize_cmd=""
+    if command_exists llama-quantize; then
+        quantize_cmd="llama-quantize"
+    elif [ -f "./llama-quantize" ]; then
+        quantize_cmd="./llama-quantize"
+    elif [ -f "./llama.cpp/llama-quantize" ]; then
+        quantize_cmd="./llama.cpp/llama-quantize"
+    else
+        print_error "llama-quantize not found!"
+        return 1
+    fi
+    
     # Use llama.cpp quantize script
-    llama-quantize \
+    $quantize_cmd \
         "$input_path" \
         "$output_path" \
         "$quant_type"
@@ -114,10 +166,18 @@ main() {
     # Create output directory
     mkdir -p "$OUTPUT_DIR"
     
-    # Check if llama.cpp is available
-    if ! command_exists python || ! python -c "import llama_cpp" 2>/dev/null; then
-        print_warning "llama-cpp-python not found. Installing..."
+    # Check if llama.cpp tools are available
+    if ! find_llama_tools; then
+        print_warning "llama.cpp tools not found. Installing..."
         install_llama_cpp
+        
+        # Check again after installation
+        if ! find_llama_tools; then
+            print_error "Failed to install or find llama.cpp tools!"
+            print_info "You can also install llama-cpp-python and use the Python script instead:"
+            print_info "python scripts/quantize_moe.py --model_path $MODEL_PATH --output_dir $OUTPUT_DIR"
+            exit 1
+        fi
     fi
     
     # Convert to GGUF first

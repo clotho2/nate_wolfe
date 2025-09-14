@@ -104,3 +104,30 @@ python scripts/merge_lora.py \
 ```
 
 This creates a standalone model that can be used for inference without needing the original base model.
+
+
+## Quantizing MoE Models
+
+After merging, create quantized versions for efficient inference:
+
+### Using Python Script
+```bash
+python scripts/quantize_moe.py \
+  --model_path ./wolfe_merged_model \
+  --output_dir ./quantized_models \
+  --quantizations Q6_K Q4_K_M
+```
+
+### Using Shell Script (Recommended)
+```bash
+./scripts/quantize_moe_simple.sh \
+  --model_path ./wolfe_merged_model \
+  --output_dir ./quantized_models \
+  --quantizations Q6_K,Q4_K_M
+```
+
+### MoE-Specific Notes
+- **Expert Layers**: llama.cpp handles MoE expert layers correctly
+- **Memory Usage**: Q6_K uses ~70% of original size, Q4_K_M uses ~50%
+- **Performance**: Q6_K maintains near-original quality, Q4_K_M is faster
+- **Compatibility**: All quantized versions work with standard llama.cpp tools

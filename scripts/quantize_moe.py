@@ -73,6 +73,13 @@ def quantize_moe_model(model_path, output_dir, quantizations=["Q6_K", "Q4_K_M"])
         if not run_command(convert_cmd, "Converting to GGUF"):
             return False
     
+    # Keep the full precision GGUF as well
+    full_gguf_path = os.path.join(output_dir, "wolfe-f17-moe-f16.gguf")
+    import shutil
+    shutil.copy2(gguf_path, full_gguf_path)
+    full_size = os.path.getsize(full_gguf_path) / (1024**3)  # GB
+    logger.info(f"✅ Full precision GGUF saved: {full_size:.2f} GB")
+    
     # Quantize to different formats
     for quant_type in quantizations:
         output_file = os.path.join(output_dir, f"wolfe-f17-moe-{quant_type}.gguf")

@@ -126,6 +126,12 @@ python scripts/quantize_moe.py \
   --quantizations Q6_K,Q4_K_M
 ```
 
+### Output Files
+The scripts will create:
+- `wolfe-f17-moe-f16.gguf` - Full precision GGUF (largest, best quality)
+- `wolfe-f17-moe-Q6_K.gguf` - Q6_K quantized (~70% size)
+- `wolfe-f17-moe-Q4_K_M.gguf` - Q4_K_M quantized (~50% size)
+
 ### MoE-Specific Notes
 - **Expert Layers**: llama.cpp handles MoE expert layers correctly
 - **Memory Usage**: Q6_K uses ~70% of original size, Q4_K_M uses ~50%

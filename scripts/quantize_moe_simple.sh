@@ -124,6 +124,12 @@ main() {
     local gguf_path="$OUTPUT_DIR/model.gguf"
     convert_to_gguf "$MODEL_PATH" "$gguf_path"
     
+    # Keep the full precision GGUF as well
+    local full_gguf="$OUTPUT_DIR/wolfe-f17-moe-f16.gguf"
+    cp "$gguf_path" "$full_gguf"
+    local full_size=$(du -h "$full_gguf" | cut -f1)
+    print_success "Full precision GGUF saved: $full_size"
+    
     # Quantize to different formats
     for quant_type in "${QUANTIZATIONS[@]}"; do
         local output_file="$OUTPUT_DIR/wolfe-f17-moe-${quant_type}.gguf"

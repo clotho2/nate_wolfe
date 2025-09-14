@@ -662,12 +662,43 @@ def main():
     # Execute training
     trainer.train()
     
-    # Save the model
+    # Save the model using PEFT's method (more reliable)
     logger.info("💾 Saving trained model...")
-    trainer.save_model()
-    
-    # Save LoRA adapter separately
-    model.save_pretrained(args.output_dir)
+    try:
+        # Use PEFT's save_pretrained method instead of trainer.save_model()
+        model.save_pretrained(args.output_dir)
+        tokenizer.save_pretrained(args.output_dir)
+        logger.info("✅ Model saved successfully using PEFT method")
+    except Exception as e:
+        logger.error(f"❌ PEFT save failed: {e}")
+        logger.info("🔄 Trying alternative save method...")
+        
+        # Fallback: save manually
+        try:
+            # Save adapter config
+            if hasattr(model, 'peft_config'):
+                import json
+                config = model.peft_config
+                with open(os.path.join(args.output_dir, "adapter_config.json"), "w") as f:
+                    json.dump(config, f, indent=2)
+            
+            # Save adapter weights
+            adapter_weights = {}
+            for name, param in model.named_parameters():
+                if param.requires_grad and 'lora' in name.lower():
+                    adapter_weights[name] = param.detach().cpu()
+            
+            if adapter_weights:
+                torch.save(adapter_weights, os.path.join(args.output_dir, "adapter_model.bin"))
+                logger.info(f"✅ Saved {len(adapter_weights)} adapter parameters")
+            
+            # Save tokenizer
+            tokenizer.save_pretrained(args.output_dir)
+            logger.info("✅ Model saved using fallback method")
+            
+        except Exception as e2:
+            logger.error(f"❌ All save methods failed: {e2}")
+            return False
     
     logger.info("🔥 MoE LoRA TRAINING COMPLETE!")
     logger.info(f"💾 Model saved: {args.output_dir}")

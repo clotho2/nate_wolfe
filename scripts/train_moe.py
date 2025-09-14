@@ -241,29 +241,42 @@ def setup_lora_config(args, model):
     proj_modules = [name for name in all_module_names if 'proj' in name.lower()]
     logger.info(f"🔍 Found projection modules: {proj_modules[:10]}...")  # Show first 10
     
-    # Use a minimal set of modules that are most likely to exist
-    target_modules = ["q_proj", "v_proj", "k_proj", "o_proj"]
+    # For Mixtral/MoE models, we need to be more specific about targeting
+    # Let's use a proven configuration that works with MixtralForCausalLM
+    target_modules = [
+        "q_proj",      # Query projection
+        "k_proj",      # Key projection  
+        "v_proj",      # Value projection
+        "o_proj",      # Output projection
+        "gate_proj",   # Gate projection (MoE)
+        "up_proj",     # Up projection (MoE)
+        "down_proj",   # Down projection (MoE)
+    ]
     
-    # Add MoE-specific modules if they exist
-    if any('gate_proj' in name for name in all_module_names):
-        target_modules.append("gate_proj")
-    if any('up_proj' in name for name in all_module_names):
-        target_modules.append("up_proj")
-    if any('down_proj' in name for name in all_module_names):
-        target_modules.append("down_proj")
+    # Filter to only include modules that actually exist in the model
+    existing_targets = []
+    for target in target_modules:
+        if any(target in name for name in all_module_names):
+            existing_targets.append(target)
+    
+    if not existing_targets:
+        # Fallback to basic attention modules
+        existing_targets = ["q_proj", "v_proj"]
+        logger.warning("⚠️  Using fallback LoRA targets")
     
     peft_config = LoraConfig(
         r=args.router_lora_r,
         lora_alpha=args.lora_alpha,
-        target_modules=target_modules,
+        target_modules=existing_targets,
         lora_dropout=args.lora_dropout,
         bias="none",
         task_type=TaskType.CAUSAL_LM,
+        modules_to_save=None,  # Don't save any modules
     )
     
     logger.info(f"✅ MoE LoRA config created:")
     logger.info(f"   LoRA rank: r={args.router_lora_r}, alpha={args.lora_alpha}")
-    logger.info(f"   Target modules: {target_modules}")
+    logger.info(f"   Target modules: {existing_targets}")
     logger.info(f"   🧠 Targeted LoRA configuration for this specific model")
     
     return peft_config
@@ -355,6 +368,10 @@ def main():
         logger.error(f"❌ Failed to load model: {e}")
         return False
     
+    # CRITICAL: Enable input gradients for training
+    model.enable_input_require_grads()
+    logger.info("🔧 Enabled input gradients for training")
+    
     # Log MoE configuration (these are set in the model config, not as parameters)
     logger.info(f"🎭 MoE Configuration:")
     logger.info(f"   Number of experts: {getattr(model.config, 'num_experts', 'Unknown')}")
@@ -418,6 +435,17 @@ def main():
     for param in model.parameters():
         if param.requires_grad:
             param.requires_grad = True
+    
+    # Verify LoRA parameters are properly integrated
+    lora_params_with_grad = 0
+    for name, param in model.named_parameters():
+        if 'lora' in name.lower() and param.requires_grad:
+            lora_params_with_grad += 1
+    
+    logger.info(f"🔧 LoRA parameters with gradients: {lora_params_with_grad}")
+    if lora_params_with_grad == 0:
+        logger.error("❌ No LoRA parameters have gradients enabled!")
+        return False
     
     # Debug: Print model structure after LoRA
     logger.info("🔍 Model structure after LoRA:")

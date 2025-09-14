@@ -229,32 +229,42 @@ class DenseDataProcessor:
         
         return conversations
 
-def setup_lora_config(args):
+def setup_lora_config(args, model):
     """Setup LoRA configuration for MoE model per Nate's recommendations"""
     
-    # First, let's try a simpler approach with common module names
-    # We'll use a more generic target that should work with most models
+    # Get all module names in the model to find the right targets
+    all_module_names = []
+    for name, module in model.named_modules():
+        all_module_names.append(name)
+    
+    # Find modules that contain 'proj' (projections) - these are likely LoRA targets
+    proj_modules = [name for name in all_module_names if 'proj' in name.lower()]
+    logger.info(f"🔍 Found projection modules: {proj_modules[:10]}...")  # Show first 10
+    
+    # Use a minimal set of modules that are most likely to exist
+    target_modules = ["q_proj", "v_proj", "k_proj", "o_proj"]
+    
+    # Add MoE-specific modules if they exist
+    if any('gate_proj' in name for name in all_module_names):
+        target_modules.append("gate_proj")
+    if any('up_proj' in name for name in all_module_names):
+        target_modules.append("up_proj")
+    if any('down_proj' in name for name in all_module_names):
+        target_modules.append("down_proj")
+    
     peft_config = LoraConfig(
         r=args.router_lora_r,
         lora_alpha=args.lora_alpha,
-        target_modules=[
-            "q_proj",         # Query projection (common in most models)
-            "v_proj",         # Value projection (common in most models)
-            "k_proj",         # Key projection (common in most models)
-            "o_proj",         # Output projection (common in most models)
-            "gate_proj",      # Gate projection (for MoE)
-            "up_proj",        # Up projection (for MoE)
-            "down_proj",      # Down projection (for MoE)
-        ],
+        target_modules=target_modules,
         lora_dropout=args.lora_dropout,
         bias="none",
         task_type=TaskType.CAUSAL_LM,
     )
     
-    logger.info(f"✅ MoE LoRA config created with common module names:")
+    logger.info(f"✅ MoE LoRA config created:")
     logger.info(f"   LoRA rank: r={args.router_lora_r}, alpha={args.lora_alpha}")
-    logger.info(f"   Target modules: {peft_config.target_modules}")
-    logger.info(f"   🧠 Generic LoRA configuration for MoE model")
+    logger.info(f"   Target modules: {target_modules}")
+    logger.info(f"   🧠 Targeted LoRA configuration for this specific model")
     
     return peft_config
 
@@ -365,7 +375,7 @@ def main():
                 logger.info(f"   Found MoE component: {name} - {type(module)}")
     
     # Setup LoRA
-    peft_config = setup_lora_config(args)
+    peft_config = setup_lora_config(args, model)
     
     # Debug: Print model structure before LoRA
     logger.info("🔍 Model structure before LoRA:")
@@ -402,6 +412,12 @@ def main():
         except Exception as e2:
             logger.error(f"❌ Simple LoRA also failed: {e2}")
             return False
+    
+    # Ensure model is in training mode and gradients are enabled
+    model.train()
+    for param in model.parameters():
+        if param.requires_grad:
+            param.requires_grad = True
     
     # Debug: Print model structure after LoRA
     logger.info("🔍 Model structure after LoRA:")
@@ -603,6 +619,16 @@ def main():
     
     if final_trainable == 0:
         logger.error("❌ No trainable parameters found before training!")
+        return False
+    
+    # Final check: ensure model is in training mode and gradients are enabled
+    model.train()
+    grad_params = sum(1 for p in model.parameters() if p.requires_grad)
+    logger.info(f"🔧 Model training mode: {model.training}")
+    logger.info(f"🔧 Parameters requiring gradients: {grad_params}")
+    
+    if grad_params == 0:
+        logger.error("❌ No parameters require gradients! Training will fail.")
         return False
     
     # Execute training

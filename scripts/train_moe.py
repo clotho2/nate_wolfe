@@ -260,15 +260,29 @@ def freeze_router_parameters(model):
     """Freeze router parameters for initial training steps per Nate's protocol"""
     frozen_params = 0
     for name, param in model.named_parameters():
-        # Only freeze if it's a LoRA parameter and contains gate/router
-        if param.requires_grad and ('gate' in name.lower() or 'router' in name.lower()):
+        # Only freeze actual router/gate parameters, not expert gate_proj parameters
+        if param.requires_grad and (
+            'gate' in name.lower() and 'lora' in name.lower() and 
+            ('gate_proj' not in name.lower())  # Don't freeze expert gate_proj
+        ):
             param.requires_grad = False
             frozen_params += 1
+            logger.info(f"   Frozen: {name}")
+    
     logger.info(f"🧊 Frozen {frozen_params} router parameters")
     
     # Verify we still have some trainable parameters
     trainable_after_freeze = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"✅ Trainable parameters after router freeze: {trainable_after_freeze:,}")
+    
+    if trainable_after_freeze == 0:
+        logger.warning("⚠️  No trainable parameters after router freeze - unfreezing all LoRA parameters")
+        # Unfreeze all LoRA parameters if we accidentally froze everything
+        for name, param in model.named_parameters():
+            if 'lora' in name.lower():
+                param.requires_grad = True
+        trainable_after_freeze = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        logger.info(f"✅ Restored trainable parameters: {trainable_after_freeze:,}")
     
     return model
 
@@ -341,8 +355,9 @@ def main():
     model.train()
     
     # Per Nate's protocol: Freeze router for first 500-1000 steps
-    logger.info(f"🧊 Freezing router for first {args.router_freeze_steps} steps...")
-    model = freeze_router_parameters(model)
+    # Note: Disabled router freezing for now due to parameter identification issues
+    logger.info(f"🧊 Router freezing disabled - training all LoRA parameters together")
+    # model = freeze_router_parameters(model)
     
     # Verify some parameters require gradients
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -491,20 +506,13 @@ def main():
     def custom_training_step(self, model, inputs):
         nonlocal global_step, router_unfrozen
         
-        # Unfreeze router after specified steps
-        if not router_unfrozen and global_step >= args.router_freeze_steps:
-            logger.info(f"🔥 Unfreezing router at step {global_step}...")
-            model = unfreeze_router_parameters(model)
-            router_unfrozen = True
-        
-        # Call original training step
+        # Router freezing is disabled, so just call original training step
         result = original_train_step(self, model, inputs)
         global_step += 1
         
-        # Log router status periodically
+        # Log training progress periodically
         if global_step % 100 == 0:
-            router_status = "UNFROZEN" if router_unfrozen else "FROZEN"
-            logger.info(f"   Step {global_step}: Router {router_status}")
+            logger.info(f"   Step {global_step}: Training all LoRA parameters")
         
         return result
     

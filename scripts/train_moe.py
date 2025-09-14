@@ -441,14 +441,35 @@ def main():
     
     # Load conversation data
     logger.info("🔥 Loading conversation data...")
+    
+    # Check conversation file size
+    conv_file_size = os.path.getsize(args.data_config) / (1024 * 1024)  # MB
+    logger.info(f"   Conversation file size: {conv_file_size:.1f} MB")
+    
     conversations = processor.load_conversations(args.data_config)
+    logger.info(f"   Loaded {len(conversations)} conversation examples")
     
     # Load memory data
     memory_file = "dataset-memory.jsonl"
     if os.path.exists(memory_file):
         logger.info("🧠 Loading memory data...")
+        
+        # Check file size first
+        file_size = os.path.getsize(memory_file) / (1024 * 1024)  # MB
+        logger.info(f"   Memory file size: {file_size:.1f} MB")
+        
+        # Count lines in file
+        with open(memory_file, 'r', encoding='utf-8') as f:
+            total_lines = sum(1 for _ in f)
+        logger.info(f"   Total lines in memory file: {total_lines}")
+        
         memory_data = processor.load_conversations(memory_file)
         logger.info(f"   Loaded {len(memory_data)} memory examples")
+        
+        # Show sample of memory data
+        if memory_data:
+            sample_text = memory_data[0][:200] if len(memory_data[0]) > 200 else memory_data[0]
+            logger.info(f"   Sample memory data: {sample_text}...")
     else:
         logger.warning(f"⚠️  Memory file not found: {memory_file}")
         memory_data = []

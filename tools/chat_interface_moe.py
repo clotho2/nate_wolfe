@@ -209,16 +209,22 @@ class DarkChampionChatInterface:
             raise ImportError("llama-cpp-python not installed. Run: pip install llama-cpp-python")
         
         print("🧠 Loading Dark Champion MoE GGUF model...")
+        print(f"   Model path: {self.model_path}")
+        print(f"   GPU layers: {-1 if self.use_gpu and torch.cuda.is_available() else 0}")
+        print(f"   Context size: 131072")
         
         # Load GGUF model
-        self.model = Llama(
-            model_path=self.model_path,
-            n_gpu_layers=-1 if self.use_gpu and torch.cuda.is_available() else 0,
-            n_ctx=131072,  # Full Dark Champion context window (131K)
-            verbose=False
-        )
-        
-        print("✅ GGUF model loaded successfully!")
+        try:
+            self.model = Llama(
+                model_path=self.model_path,
+                n_gpu_layers=-1 if self.use_gpu and torch.cuda.is_available() else 0,
+                n_ctx=131072,  # Full Dark Champion context window (131K)
+                verbose=True  # Enable verbose for debugging
+            )
+            print("✅ GGUF model loaded successfully!")
+        except Exception as e:
+            print(f"❌ Failed to load GGUF model: {e}")
+            raise
     
     def _format_messages(self, user_input: str) -> List[Dict[str, str]]:
         """Format messages for the Dark Champion chat template."""
@@ -303,17 +309,32 @@ class DarkChampionChatInterface:
         # Add generation prompt
         prompt += "<|start_header_id|>assistant<|end_header_id|>\n\n"
         
-        # Generate
-        response = self.model(
-            prompt,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            repeat_penalty=1.1,
-            stop=["<|eot_id|>", "<|end_of_text|>"]
-        )
+        # Debug: Print prompt (first 200 chars)
+        print(f"\n[DEBUG] Prompt preview: {prompt[:200]}...")
         
-        return response["choices"][0]["text"].strip()
+        # Generate
+        try:
+            response = self.model(
+                prompt,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                repeat_penalty=1.1,
+                stop=["<|eot_id|>", "<|end_of_text|>"]
+            )
+            
+            # Debug: Print full response
+            print(f"[DEBUG] Raw response: {response}")
+            
+            if "choices" in response and len(response["choices"]) > 0:
+                return response["choices"][0]["text"].strip()
+            else:
+                print(f"[DEBUG] No choices in response: {response}")
+                return "No response generated"
+                
+        except Exception as e:
+            print(f"[DEBUG] Generation error: {e}")
+            return f"Error: {e}"
     
     def generate_response(self, user_input: str) -> str:
         """Generate response using the appropriate method."""
@@ -345,7 +366,7 @@ class DarkChampionChatInterface:
                     
                     print("Wolfe: ", end="", flush=True)
                     response = self.generate_response(user_input)
-                    print()
+                    print(response)
                     
                     # Add to history
                     self.history.append({

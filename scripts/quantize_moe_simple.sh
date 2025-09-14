@@ -50,9 +50,13 @@ install_llama_cpp() {
     
     cd llama.cpp
     
-    # Build llama.cpp
-    print_info "Building llama.cpp..."
+    # Build llama.cpp using CMake
+    print_info "Building llama.cpp with CMake..."
+    mkdir -p build
+    cd build
+    cmake ..
     make -j$(nproc)
+    cd ..
     
     # Install Python bindings
     print_info "Installing Python bindings..."
@@ -83,6 +87,12 @@ find_llama_tools() {
         return 0
     fi
     
+    # Check if they're in llama.cpp build directory
+    if [ -f "./llama.cpp/build/llama-convert" ] && [ -f "./llama.cpp/build/llama-quantize" ]; then
+        print_success "Found llama.cpp tools in llama.cpp/build directory"
+        return 0
+    fi
+    
     return 1
 }
 
@@ -101,6 +111,8 @@ convert_to_gguf() {
         convert_cmd="./llama-convert"
     elif [ -f "./llama.cpp/llama-convert" ]; then
         convert_cmd="./llama.cpp/llama-convert"
+    elif [ -f "./llama.cpp/build/llama-convert" ]; then
+        convert_cmd="./llama.cpp/build/llama-convert"
     else
         print_error "llama-convert not found!"
         return 1
@@ -131,6 +143,8 @@ quantize_model() {
         quantize_cmd="./llama-quantize"
     elif [ -f "./llama.cpp/llama-quantize" ]; then
         quantize_cmd="./llama.cpp/llama-quantize"
+    elif [ -f "./llama.cpp/build/llama-quantize" ]; then
+        quantize_cmd="./llama.cpp/build/llama-quantize"
     else
         print_error "llama-quantize not found!"
         return 1

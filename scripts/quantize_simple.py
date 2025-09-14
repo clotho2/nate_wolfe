@@ -34,6 +34,17 @@ def convert_to_gguf(model_path, output_path):
         convert_hf_to_gguf(model_path, output_path, outtype="f16")
         print(f"✅ Converted to {output_path}")
         return True
+    except ImportError:
+        # Try alternative import
+        try:
+            from llama_cpp.convert_hf_to_gguf import convert_hf_to_gguf
+            print(f"🔄 Converting {model_path} to GGUF...")
+            convert_hf_to_gguf(model_path, output_path, outtype="f16")
+            print(f"✅ Converted to {output_path}")
+            return True
+        except Exception as e:
+            print(f"❌ Conversion failed: {e}")
+            return False
     except Exception as e:
         print(f"❌ Conversion failed: {e}")
         return False
@@ -49,6 +60,20 @@ def quantize_gguf(input_path, output_path, quant_type):
         file_size = os.path.getsize(output_path) / (1024**3)  # GB
         print(f"✅ {quant_type} quantization complete: {file_size:.2f} GB")
         return True
+    except ImportError:
+        # Try alternative import
+        try:
+            from llama_cpp.quantize import quantize
+            print(f"🔄 Quantizing to {quant_type}...")
+            quantize(input_path, output_path, quant_type)
+            
+            # Get file size
+            file_size = os.path.getsize(output_path) / (1024**3)  # GB
+            print(f"✅ {quant_type} quantization complete: {file_size:.2f} GB")
+            return True
+        except Exception as e:
+            print(f"❌ Quantization failed: {e}")
+            return False
     except Exception as e:
         print(f"❌ Quantization failed: {e}")
         return False

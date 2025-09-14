@@ -466,7 +466,7 @@ def main():
     # Override trainer's training step to handle router unfreezing
     original_train_step = trainer.training_step
     
-    def custom_training_step(model, inputs):
+    def custom_training_step(self, model, inputs):
         nonlocal global_step, router_unfrozen
         
         # Unfreeze router after specified steps
@@ -476,7 +476,7 @@ def main():
             router_unfrozen = True
         
         # Call original training step
-        result = original_train_step(model, inputs)
+        result = original_train_step(self, model, inputs)
         global_step += 1
         
         # Log router status periodically

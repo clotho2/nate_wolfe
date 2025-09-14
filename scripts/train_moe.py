@@ -401,7 +401,7 @@ def main():
         dataloader_num_workers=args.dataloader_num_workers,
         logging_steps=10,
         save_strategy="no",  # NO CHECKPOINTING - prevents memory issues
-        evaluation_strategy="no",
+        eval_strategy="no",
         report_to="none",
         remove_unused_columns=False,
         # MoE-specific optimizations per Nate's recommendations

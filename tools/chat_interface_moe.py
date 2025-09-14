@@ -214,7 +214,7 @@ class DarkChampionChatInterface:
         self.model = Llama(
             model_path=self.model_path,
             n_gpu_layers=-1 if self.use_gpu and torch.cuda.is_available() else 0,
-            n_ctx=8192,  # Context window
+            n_ctx=131072,  # Full Dark Champion context window (131K)
             verbose=False
         )
         

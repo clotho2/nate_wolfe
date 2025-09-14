@@ -20,8 +20,8 @@ This guide explains how to set up the Dark Champion MoE model with Ollama on you
 
 ### Step 1: Copy GGUF File
 ```bash
-# Copy your quantized model to the Ollama models directory
-cp ./quantized_models/wolfe-f17-moe-Q6_K.gguf ~/.ollama/models/
+# Copy your full precision GGUF model to the Ollama models directory
+cp ./quantized_models/wolfe-f17-moe-f16.gguf ~/.ollama/models/
 ```
 
 ### Step 2: Create Modelfile
@@ -50,7 +50,7 @@ The Modelfile includes optimized parameters for Dark Champion MoE:
 PARAMETER temperature 0.3      # Recommended: 0.1-0.5
 PARAMETER top_p 0.9           # Nucleus sampling
 PARAMETER repeat_penalty 1.1  # Prevent repetition
-PARAMETER num_ctx 8192        # Context window
+PARAMETER num_ctx 131072      # Full Dark Champion context window (131K)
 PARAMETER num_predict 512     # Max response length
 ```
 
@@ -76,20 +76,21 @@ ollama run wolfe-moe --temperature 0.2 --top-p 0.95 "Your message here"
 
 ## 📊 **Model Performance on EX-44**
 
-| Model | Size | VRAM | Speed | Quality |
-|-------|------|------|-------|---------|
-| Q6_K | ~12GB | ~14GB | Fast | Excellent |
-| Q4_K_M | ~9GB | ~11GB | Faster | Very Good |
-| F16 | ~18GB | ~20GB | Medium | Best |
+| Model | Size | VRAM | Speed | Quality | Context |
+|-------|------|------|-------|---------|---------|
+| F16 | ~18GB | ~20GB | Medium | Best | 131K |
+| Q6_K | ~12GB | ~14GB | Fast | Excellent | 131K |
+| Q4_K_M | ~9GB | ~11GB | Faster | Very Good | 131K |
 
 ## 🎯 **Recommended Configuration**
 
 For your EX-44, I recommend:
 
-1. **Use Q6_K GGUF** - Best balance of quality and speed
+1. **Use F16 GGUF** - Full precision, best quality
 2. **Temperature 0.3** - Optimal for Wolfe's personality
-3. **Context 8192** - Good for conversations
+3. **Context 131,072** - Full Dark Champion context window
 4. **Simple template** - Reliable with Ollama
+5. **Fallback to Q6_K** - Only if F16 is too slow
 
 ## 🚨 **Troubleshooting**
 

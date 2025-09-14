@@ -126,14 +126,21 @@ for quant_type in "${QUANTIZATIONS[@]}"; do
         ./llama.cpp/llama-quantize "$OUTPUT_DIR/model.gguf" "$output_file" "$quant_type"
     elif [ -f "./llama.cpp/build/llama-quantize" ]; then
         ./llama.cpp/build/llama-quantize "$OUTPUT_DIR/model.gguf" "$output_file" "$quant_type"
+    elif [ -f "./llama.cpp/build/bin/llama-quantize" ]; then
+        ./llama.cpp/build/bin/llama-quantize "$OUTPUT_DIR/model.gguf" "$output_file" "$quant_type"
     else
         print_error "llama-quantize not found!"
         print_info "Trying Python method instead..."
         python3 -c "
 import sys
 sys.path.append('./llama.cpp')
-from llama_cpp import quantize
-quantize('$OUTPUT_DIR/model.gguf', '$output_file', '$quant_type')
+try:
+    from llama_cpp import quantize
+    quantize('$OUTPUT_DIR/model.gguf', '$output_file', '$quant_type')
+    print('Quantization completed via Python')
+except ImportError as e:
+    print(f'Python quantization failed: {e}')
+    sys.exit(1)
 "
     fi
     

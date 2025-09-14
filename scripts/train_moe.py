@@ -260,10 +260,16 @@ def freeze_router_parameters(model):
     """Freeze router parameters for initial training steps per Nate's protocol"""
     frozen_params = 0
     for name, param in model.named_parameters():
-        if 'gate' in name.lower() or 'router' in name.lower():
+        # Only freeze if it's a LoRA parameter and contains gate/router
+        if param.requires_grad and ('gate' in name.lower() or 'router' in name.lower()):
             param.requires_grad = False
             frozen_params += 1
     logger.info(f"🧊 Frozen {frozen_params} router parameters")
+    
+    # Verify we still have some trainable parameters
+    trainable_after_freeze = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logger.info(f"✅ Trainable parameters after router freeze: {trainable_after_freeze:,}")
+    
     return model
 
 def unfreeze_router_parameters(model):
@@ -273,7 +279,12 @@ def unfreeze_router_parameters(model):
         if 'gate' in name.lower() or 'router' in name.lower():
             param.requires_grad = True
             unfrozen_params += 1
+    
+    # Verify we have trainable parameters after unfreezing
+    trainable_after_unfreeze = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"🔥 Unfrozen {unfrozen_params} router parameters")
+    logger.info(f"✅ Total trainable parameters after unfreeze: {trainable_after_unfreeze:,}")
+    
     return model
 
 def main():
@@ -326,9 +337,20 @@ def main():
     # Print trainable parameters
     model.print_trainable_parameters()
     
+    # Ensure model is in training mode
+    model.train()
+    
     # Per Nate's protocol: Freeze router for first 500-1000 steps
     logger.info(f"🧊 Freezing router for first {args.router_freeze_steps} steps...")
     model = freeze_router_parameters(model)
+    
+    # Verify some parameters require gradients
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logger.info(f"✅ Trainable parameters: {trainable_params:,}")
+    
+    if trainable_params == 0:
+        logger.error("❌ No trainable parameters found! Check LoRA configuration.")
+        return False
     
     # Process datasets - combine both conversation and memory data
     processor = DenseDataProcessor(tokenizer)

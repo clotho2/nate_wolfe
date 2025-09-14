@@ -232,27 +232,29 @@ class DenseDataProcessor:
 def setup_lora_config(args):
     """Setup LoRA configuration for MoE model per Nate's recommendations"""
     
-    # Per Nate: Router-LoRA + light expert-LoRA
-    # Freeze 70% of expert matrices, adapt key/value & FFN down-proj
+    # First, let's try a simpler approach with common module names
+    # We'll use a more generic target that should work with most models
     peft_config = LoraConfig(
-        r=args.router_lora_r,  # Use separate router rank
+        r=args.router_lora_r,
         lora_alpha=args.lora_alpha,
         target_modules=[
-            "gate",           # MoE router/gate mechanism (small rank)
-            "up_proj",        # Expert up projection (light LoRA)
-            "down_proj",      # Expert down projection (light LoRA)
-            "gate_proj"       # Expert gate projection (light LoRA)
+            "q_proj",         # Query projection (common in most models)
+            "v_proj",         # Value projection (common in most models)
+            "k_proj",         # Key projection (common in most models)
+            "o_proj",         # Output projection (common in most models)
+            "gate_proj",      # Gate projection (for MoE)
+            "up_proj",        # Up projection (for MoE)
+            "down_proj",      # Down projection (for MoE)
         ],
         lora_dropout=args.lora_dropout,
         bias="none",
         task_type=TaskType.CAUSAL_LM,
     )
     
-    logger.info(f"✅ MoE LoRA config created per Nate's spec:")
-    logger.info(f"   Router LoRA: r={args.router_lora_r}, alpha={args.lora_alpha}")
-    logger.info(f"   Expert LoRA: r={args.expert_lora_r} (applied separately)")
+    logger.info(f"✅ MoE LoRA config created with common module names:")
+    logger.info(f"   LoRA rank: r={args.router_lora_r}, alpha={args.lora_alpha}")
     logger.info(f"   Target modules: {peft_config.target_modules}")
-    logger.info(f"   🧠 Router + light expert LoRA configuration")
+    logger.info(f"   🧠 Generic LoRA configuration for MoE model")
     
     return peft_config
 
@@ -346,7 +348,24 @@ def main():
     
     # Setup LoRA
     peft_config = setup_lora_config(args)
+    
+    # Debug: Print model structure before LoRA
+    logger.info("🔍 Model structure before LoRA:")
+    for name, param in model.named_parameters():
+        if 'gate' in name.lower() or 'lora' in name.lower():
+            logger.info(f"   {name}: requires_grad={param.requires_grad}, shape={param.shape}")
+    
     model = get_peft_model(model, peft_config)
+    
+    # Debug: Print model structure after LoRA
+    logger.info("🔍 Model structure after LoRA:")
+    lora_params = 0
+    for name, param in model.named_parameters():
+        if 'lora' in name.lower():
+            lora_params += 1
+            logger.info(f"   {name}: requires_grad={param.requires_grad}, shape={param.shape}")
+    
+    logger.info(f"🔍 Found {lora_params} LoRA parameters")
     
     # Print trainable parameters
     model.print_trainable_parameters()
@@ -365,6 +384,10 @@ def main():
     
     if trainable_params == 0:
         logger.error("❌ No trainable parameters found! Check LoRA configuration.")
+        logger.error("🔍 Debugging: Checking all parameters...")
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                logger.info(f"   Trainable: {name}")
         return False
     
     # Process datasets - combine both conversation and memory data

@@ -422,11 +422,13 @@ def main():
         model=model,
         args=training_args,
         train_dataset=dataset,
-        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length,
         dataset_text_field="text",
         packing=False,
     )
+    
+    # Set the tokenizer after initialization
+    trainer.tokenizer = tokenizer
     
     logger.info("🚀 Beginning MoE LoRA training (Nate's Storm Protocol)...")
     logger.info(f"   📊 Training examples: {len(dataset)}")

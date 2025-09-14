@@ -81,18 +81,24 @@ print_info "   Model: $MODEL_PATH"
 print_info "   Output: $OUTPUT_DIR"
 print_info "   Quantizations: ${QUANTIZATIONS[*]}"
 
-# Convert to GGUF using Python script
-print_info "🔄 Converting model to GGUF format..."
-python3 ./llama.cpp/convert_hf_to_gguf.py \
-    "$MODEL_PATH" \
-    --outfile "$OUTPUT_DIR/model.gguf" \
-    --outtype f16
-
-if [ $? -eq 0 ]; then
-    print_success "Model converted to GGUF"
+# Convert to GGUF using Python script (only if not already exists)
+if [ -f "$OUTPUT_DIR/model.gguf" ]; then
+    print_info "✅ GGUF file already exists, skipping conversion"
+    file_size=$(du -h "$OUTPUT_DIR/model.gguf" | cut -f1)
+    print_info "   Existing file size: $file_size"
 else
-    print_error "Conversion failed!"
-    exit 1
+    print_info "🔄 Converting model to GGUF format..."
+    python3 ./llama.cpp/convert_hf_to_gguf.py \
+        "$MODEL_PATH" \
+        --outfile "$OUTPUT_DIR/model.gguf" \
+        --outtype f16
+
+    if [ $? -eq 0 ]; then
+        print_success "Model converted to GGUF"
+    else
+        print_error "Conversion failed!"
+        exit 1
+    fi
 fi
 
 # Keep full precision GGUF
@@ -103,6 +109,13 @@ print_success "Full precision GGUF saved: $file_size"
 # Quantize to different formats
 for quant_type in "${QUANTIZATIONS[@]}"; do
     output_file="$OUTPUT_DIR/wolfe-f17-moe-${quant_type}.gguf"
+    
+    if [ -f "$output_file" ]; then
+        print_info "✅ $quant_type file already exists, skipping quantization"
+        file_size=$(du -h "$output_file" | cut -f1)
+        print_info "   Existing file size: $file_size"
+        continue
+    fi
     
     print_info "🔄 Quantizing to $quant_type..."
     

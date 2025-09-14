@@ -91,3 +91,16 @@ This keeps the MoE "thinking" strength alive while training the Wolfe personalit
 - `scripts/train_dense.py`: Dense model training script
 - `configs/merge_schedule_f17.yaml`: MergeKit routing schedule
 - `llama3-chat.jsonl`: Training dataset in Dark Champion format
+
+## Merging LoRA Adapters
+
+After training completes, you need to merge the LoRA adapters into the base model:
+
+```bash
+python scripts/merge_lora.py \
+  --adapter_path ./output/wolfe-f17-moe \
+  --output_path ./wolfe_merged_model \
+  --save_format safetensors
+```
+
+This creates a standalone model that can be used for inference without needing the original base model.

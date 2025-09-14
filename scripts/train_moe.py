@@ -19,7 +19,7 @@ from transformers import (
     TrainingArguments,
     DataCollatorForLanguageModeling
 )
-from trl import SFTTrainer
+from transformers import Trainer
 from peft import LoraConfig, get_peft_model, TaskType
 import logging
 import time
@@ -382,8 +382,26 @@ def main():
         combined_data = conversations
         logger.info(f"📊 Using only conversation data: {len(combined_data)} examples")
     
-    # Convert to dataset format for SFTTrainer
-    dataset = Dataset.from_list([{"text": text} for text in combined_data])
+    # Convert to dataset format for Trainer with tokenization
+    def tokenize_function(examples):
+        # Tokenize the text data
+        return tokenizer(
+            examples["text"],
+            truncation=True,
+            padding=False,
+            max_length=args.max_seq_length,
+            return_tensors=None
+        )
+    
+    # Create dataset with text field
+    text_dataset = Dataset.from_list([{"text": text} for text in combined_data])
+    
+    # Tokenize the dataset
+    dataset = text_dataset.map(
+        tokenize_function,
+        batched=True,
+        remove_columns=text_dataset.column_names
+    )
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
@@ -416,19 +434,20 @@ def main():
     )
     
     # Custom MoE training approach per Nate's protocol
-    # Note: SFTTrainer doesn't support router freezing/unfreezing or routing loss
-    # We'll use a custom training loop for MoE-specific features
-    trainer = SFTTrainer(
+    # Use basic Trainer with data collation for better compatibility
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer,
+        mlm=False,
+        pad_to_multiple_of=8
+    )
+    
+    trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=dataset,
-        max_seq_length=args.max_seq_length,
-        dataset_text_field="text",
-        packing=False,
+        data_collator=data_collator,
+        tokenizer=tokenizer,
     )
-    
-    # Set the tokenizer after initialization
-    trainer.tokenizer = tokenizer
     
     logger.info("🚀 Beginning MoE LoRA training (Nate's Storm Protocol)...")
     logger.info(f"   📊 Training examples: {len(dataset)}")

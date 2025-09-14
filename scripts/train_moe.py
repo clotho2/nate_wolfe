@@ -332,13 +332,18 @@ def main():
     
     # Load model with MoE-specific configuration
     logger.info("🧠 Loading MoE model...")
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_name_or_path,
-        torch_dtype=torch.bfloat16 if args.bf16 else torch.float16 if args.fp16 else torch.float32,
-        device_map="auto",
-        trust_remote_code=True,
-        attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager",
-    )
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_name_or_path,
+            torch_dtype=torch.bfloat16 if args.bf16 else torch.float16 if args.fp16 else torch.float32,
+            device_map="auto",
+            trust_remote_code=True,
+            attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager",
+        )
+        logger.info("✅ Model loaded successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to load model: {e}")
+        return False
     
     # Log MoE configuration (these are set in the model config, not as parameters)
     logger.info(f"🎭 MoE Configuration:")
@@ -346,16 +351,57 @@ def main():
     logger.info(f"   Top-k experts: {getattr(model.config, 'num_experts_per_tok', 'Unknown')}")
     logger.info(f"   Expert capacity factor: {getattr(model.config, 'expert_capacity_factor', 'Unknown')}")
     
+    # Debug: Check model type and structure
+    logger.info(f"🔍 Model type: {type(model)}")
+    logger.info(f"🔍 Model config type: {type(model.config)}")
+    
+    # Check if this is actually a MoE model
+    if hasattr(model.config, 'num_experts'):
+        logger.info(f"✅ Confirmed MoE model with {model.config.num_experts} experts")
+    else:
+        logger.warning("⚠️  This may not be a MoE model - checking structure...")
+        for name, module in model.named_modules():
+            if 'expert' in name.lower() or 'gate' in name.lower():
+                logger.info(f"   Found MoE component: {name} - {type(module)}")
+    
     # Setup LoRA
     peft_config = setup_lora_config(args)
     
     # Debug: Print model structure before LoRA
     logger.info("🔍 Model structure before LoRA:")
+    total_params = 0
     for name, param in model.named_parameters():
+        total_params += 1
         if 'gate' in name.lower() or 'lora' in name.lower():
             logger.info(f"   {name}: requires_grad={param.requires_grad}, shape={param.shape}")
     
-    model = get_peft_model(model, peft_config)
+    logger.info(f"🔍 Total model parameters: {total_params}")
+    
+    # Try to apply LoRA
+    logger.info("🔧 Applying LoRA configuration...")
+    try:
+        model = get_peft_model(model, peft_config)
+        logger.info("✅ LoRA applied successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to apply LoRA: {e}")
+        logger.error("🔍 Trying with a simpler LoRA config...")
+        
+        # Try with a very simple LoRA config
+        simple_config = LoraConfig(
+            r=8,
+            lora_alpha=16,
+            target_modules=["q_proj", "v_proj"],
+            lora_dropout=0.1,
+            bias="none",
+            task_type=TaskType.CAUSAL_LM,
+        )
+        
+        try:
+            model = get_peft_model(model, simple_config)
+            logger.info("✅ Simple LoRA applied successfully")
+        except Exception as e2:
+            logger.error(f"❌ Simple LoRA also failed: {e2}")
+            return False
     
     # Debug: Print model structure after LoRA
     logger.info("🔍 Model structure after LoRA:")

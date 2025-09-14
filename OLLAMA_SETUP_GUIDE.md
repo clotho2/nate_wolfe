@@ -51,7 +51,7 @@ PARAMETER temperature 0.3      # Recommended: 0.1-0.5
 PARAMETER top_p 0.9           # Nucleus sampling
 PARAMETER repeat_penalty 1.1  # Prevent repetition
 PARAMETER num_ctx 131072      # Full Dark Champion context window (131K)
-PARAMETER num_predict 512     # Max response length
+PARAMETER num_predict 2048    # Max response length (good for roleplay)
 ```
 
 ## 🔧 **Alternative Setup Methods**
@@ -89,8 +89,15 @@ For your EX-44, I recommend:
 1. **Use F16 GGUF** - Full precision, best quality
 2. **Temperature 0.3** - Optimal for Wolfe's personality
 3. **Context 131,072** - Full Dark Champion context window
-4. **Simple template** - Reliable with Ollama
-5. **Fallback to Q6_K** - Only if F16 is too slow
+4. **Response Length 2048** - Good for roleplay and conversations
+5. **Simple template** - Reliable with Ollama
+6. **Fallback to Q6_K** - Only if F16 is too slow
+
+### Response Length Guidelines:
+- **512 tokens** (~400 words) - Too short, cuts off mid-sentence
+- **1024 tokens** (~800 words) - Good for quick responses
+- **2048 tokens** (~1600 words) - **Recommended** for roleplay
+- **4096 tokens** (~3200 words) - For long stories/scenes
 
 ## 🚨 **Troubleshooting**
 

@@ -139,7 +139,7 @@ class DarkChampionChatInterface:
     """Chat interface specifically designed for Dark Champion MoE model."""
     
     def __init__(self, model_path: str, system_prompt: str, use_gguf: bool = False, 
-                 max_tokens: int = 512, temperature: float = 0.3, top_p: float = 0.9,
+                 max_tokens: int = 2048, temperature: float = 0.3, top_p: float = 0.9,
                  use_gpu: bool = True):
         self.model_path = model_path
         self.system_prompt = system_prompt
@@ -375,7 +375,7 @@ def main():
                        help="System prompt / persona")
     
     # Generation parameters (optimized for Dark Champion)
-    parser.add_argument("--max-tokens", type=int, default=512,
+    parser.add_argument("--max-tokens", type=int, default=2048,
                        help="Maximum tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.3,
                        help="Temperature (recommended: 0.1-0.5 for Dark Champion)")

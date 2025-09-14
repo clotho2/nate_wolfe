@@ -175,10 +175,10 @@ def parse_args():
                        help="LoRA rank for experts (per Nate: 32)")
     parser.add_argument("--zero_stage", type=int, default=3,
                        help="DeepSpeed ZeRO stage (per Nate: 3)")
-    parser.add_argument("--conversation_ratio", type=float, default=0.8,
-                       help="Ratio of conversation data (per Nate: 80%)")
-    parser.add_argument("--memory_ratio", type=float, default=0.2,
-                       help="Ratio of memory/reasoning data (per Nate: 20%)")
+    parser.add_argument("--conversation_ratio", type=float, default=1.0,
+                       help="Ratio of conversation data to use (default: 1.0 = use all)")
+    parser.add_argument("--memory_ratio", type=float, default=1.0,
+                       help="Ratio of memory/reasoning data to use (default: 1.0 = use all)")
     
     # Other options
     parser.add_argument("--bf16", action="store_true",
@@ -482,35 +482,31 @@ def main():
     conversation_ratio = args.conversation_ratio
     memory_ratio = args.memory_ratio
     
-    # Sample data according to ratios
+    # Use ALL available data (no artificial sampling)
     if memory_data:
-        # Take 80% of conversations
-        conv_sample_size = int(total_conversations * conversation_ratio)
-        # Take 20% equivalent in memory data
-        memory_sample_size = int(total_conversations * memory_ratio)
-        
-        # Sample the data
+        # Use ALL conversations and ALL memory data
         import random
         random.seed(42)  # For reproducibility
         
-        sampled_conversations = random.sample(conversations, min(conv_sample_size, total_conversations))
-        sampled_memory = random.sample(memory_data, min(memory_sample_size, total_memory))
-        
-        # Combine datasets
-        combined_data = sampled_conversations + sampled_memory
+        # Combine ALL data
+        combined_data = conversations + memory_data
         random.shuffle(combined_data)  # Shuffle for diverse batches
         
-        logger.info(f"📊 Dataset mixing (Nate's protocol):")
-        logger.info(f"   Conversations: {len(sampled_conversations)} ({conversation_ratio*100:.0f}%)")
-        logger.info(f"   Memory data: {len(sampled_memory)} ({memory_ratio*100:.0f}%)")
+        # Calculate actual ratios after combining
+        actual_conv_ratio = len(conversations) / len(combined_data)
+        actual_memory_ratio = len(memory_data) / len(combined_data)
+        
+        logger.info(f"📊 Using ALL available data (no sampling):")
+        logger.info(f"   Conversations: {len(conversations)} ({actual_conv_ratio*100:.1f}%)")
+        logger.info(f"   Memory data: {len(memory_data)} ({actual_memory_ratio*100:.1f}%)")
         logger.info(f"   Total training examples: {len(combined_data)}")
-        logger.info(f"   🎯 Mixing ratio: {conversation_ratio:.1f}/{memory_ratio:.1f} (conversations/memory)")
+        logger.info(f"   🎯 Using 100% of available data for maximum training")
         
         # Verify data types
         logger.info(f"✅ Data verification:")
-        logger.info(f"   Conversation examples: {len(sampled_conversations)} (Wolfe conversations)")
-        logger.info(f"   Memory examples: {len(sampled_memory)} (Memory text files)")
-        logger.info(f"   All data will be used for training the MoE model")
+        logger.info(f"   Conversation examples: {len(conversations)} (Wolfe conversations)")
+        logger.info(f"   Memory examples: {len(memory_data)} (Memory text files)")
+        logger.info(f"   ALL data will be used for training the MoE model")
     else:
         combined_data = conversations
         logger.info(f"📊 Using only conversation data: {len(combined_data)} examples")

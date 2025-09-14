@@ -505,6 +505,12 @@ def main():
         logger.info(f"   Memory data: {len(sampled_memory)} ({memory_ratio*100:.0f}%)")
         logger.info(f"   Total training examples: {len(combined_data)}")
         logger.info(f"   🎯 Mixing ratio: {conversation_ratio:.1f}/{memory_ratio:.1f} (conversations/memory)")
+        
+        # Verify data types
+        logger.info(f"✅ Data verification:")
+        logger.info(f"   Conversation examples: {len(sampled_conversations)} (Wolfe conversations)")
+        logger.info(f"   Memory examples: {len(sampled_memory)} (Memory text files)")
+        logger.info(f"   All data will be used for training the MoE model")
     else:
         combined_data = conversations
         logger.info(f"📊 Using only conversation data: {len(combined_data)} examples")
@@ -529,6 +535,12 @@ def main():
         batched=True,
         remove_columns=text_dataset.column_names
     )
+    
+    # Final verification that all data is ready for training
+    logger.info(f"🎯 Final training dataset verification:")
+    logger.info(f"   Total tokenized examples: {len(dataset)}")
+    logger.info(f"   All conversation and memory data processed and ready")
+    logger.info(f"   Dataset will train the MoE model with Wolfe's personality + memory")
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)

@@ -562,31 +562,19 @@ def main():
     logger.info(f"   ⚠️  Note: MoE training requires careful memory management")
     logger.info(f"   ⚠️  Consider using gradient checkpointing and smaller batch sizes")
     
-    # Custom training with router unfreezing per Nate's protocol
-    logger.info("🔥 Starting custom MoE training loop...")
+    # Standard training without custom training step
+    logger.info("🔥 Starting MoE LoRA training...")
     
-    # Track training steps for router unfreezing
-    global_step = 0
-    router_unfrozen = False
+    # Ensure model is properly configured for training
+    model.train()
     
-    # Override trainer's training step to handle router unfreezing
-    original_train_step = trainer.training_step
+    # Final verification of trainable parameters
+    final_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logger.info(f"✅ Final trainable parameters before training: {final_trainable:,}")
     
-    def custom_training_step(self, model, inputs):
-        nonlocal global_step, router_unfrozen
-        
-        # Router freezing is disabled, so just call original training step
-        result = original_train_step(self, model, inputs)
-        global_step += 1
-        
-        # Log training progress periodically
-        if global_step % 100 == 0:
-            logger.info(f"   Step {global_step}: Training all LoRA parameters")
-        
-        return result
-    
-    # Replace training step
-    trainer.training_step = custom_training_step
+    if final_trainable == 0:
+        logger.error("❌ No trainable parameters found before training!")
+        return False
     
     # Execute training
     trainer.train()

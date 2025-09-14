@@ -22,6 +22,11 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
 # Default values
 MODEL_PATH=""
 OUTPUT_DIR="./quantized_models"
@@ -100,10 +105,24 @@ for quant_type in "${QUANTIZATIONS[@]}"; do
     output_file="$OUTPUT_DIR/wolfe-f17-moe-${quant_type}.gguf"
     
     print_info "🔄 Quantizing to $quant_type..."
-    python3 ./llama.cpp/quantize.py \
-        "$OUTPUT_DIR/model.gguf" \
-        "$output_file" \
-        "$quant_type"
+    
+    # Try different locations for llama-quantize
+    if command -v llama-quantize >/dev/null 2>&1; then
+        llama-quantize "$OUTPUT_DIR/model.gguf" "$output_file" "$quant_type"
+    elif [ -f "./llama.cpp/llama-quantize" ]; then
+        ./llama.cpp/llama-quantize "$OUTPUT_DIR/model.gguf" "$output_file" "$quant_type"
+    elif [ -f "./llama.cpp/build/llama-quantize" ]; then
+        ./llama.cpp/build/llama-quantize "$OUTPUT_DIR/model.gguf" "$output_file" "$quant_type"
+    else
+        print_error "llama-quantize not found!"
+        print_info "Trying Python method instead..."
+        python3 -c "
+import sys
+sys.path.append('./llama.cpp')
+from llama_cpp import quantize
+quantize('$OUTPUT_DIR/model.gguf', '$output_file', '$quant_type')
+"
+    fi
     
     if [ $? -eq 0 ]; then
         file_size=$(du -h "$output_file" | cut -f1)

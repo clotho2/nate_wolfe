@@ -62,16 +62,24 @@ def quantize_moe_model(model_path, output_dir, quantizations=["Q6_K", "Q4_K_M"])
     if not os.path.exists(gguf_path):
         logger.info("🔄 Converting model to GGUF format...")
         
-        # Use llama.cpp convert script
+        # Try llama-convert command first, then fallback to Python module
         convert_cmd = [
-            "python", "-m", "llama_cpp.convert_hf_to_gguf",
+            "llama-convert",
             model_path,
             "--outfile", gguf_path,
             "--outtype", "f16"  # Start with f16, then quantize
         ]
         
         if not run_command(convert_cmd, "Converting to GGUF"):
-            return False
+            # Fallback to Python module
+            logger.info("🔄 Trying Python llama_cpp module...")
+            try:
+                from llama_cpp import convert_hf_to_gguf
+                convert_hf_to_gguf(model_path, gguf_path, outtype="f16")
+                logger.info("✅ Converted using Python module")
+            except Exception as e:
+                logger.error(f"❌ Both convert methods failed: {e}")
+                return False
     
     # Keep the full precision GGUF as well
     full_gguf_path = os.path.join(output_dir, "wolfe-f17-moe-f16.gguf")
@@ -88,7 +96,7 @@ def quantize_moe_model(model_path, output_dir, quantizations=["Q6_K", "Q4_K_M"])
         
         # Use llama.cpp quantize script
         quantize_cmd = [
-            "python", "-m", "llama_cpp.quantize",
+            "llama-quantize",
             gguf_path,
             output_file,
             quant_type

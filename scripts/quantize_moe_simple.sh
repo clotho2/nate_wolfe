@@ -68,7 +68,7 @@ convert_to_gguf() {
     print_info "Converting model to GGUF format..."
     
     # Use llama.cpp convert script
-    python -m llama_cpp.convert_hf_to_gguf \
+    llama-convert \
         "$model_path" \
         --outfile "$output_path" \
         --outtype f16
@@ -85,7 +85,7 @@ quantize_model() {
     print_info "Quantizing to $quant_type..."
     
     # Use llama.cpp quantize script
-    python -m llama_cpp.quantize \
+    llama-quantize \
         "$input_path" \
         "$output_path" \
         "$quant_type"

@@ -358,10 +358,10 @@ def main():
     try:
         model = AutoModelForCausalLM.from_pretrained(
             args.model_name_or_path,
-            torch_dtype=torch.bfloat16 if args.bf16 else torch.float16 if args.fp16 else torch.float32,
+            dtype=torch.bfloat16 if args.bf16 else torch.float16 if args.fp16 else torch.float32,
             device_map="auto",
             trust_remote_code=True,
-            attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager",
+            attn_implementation="eager",  # Disable Flash Attention 2 to avoid compatibility issues
         )
         logger.info("✅ Model loaded successfully")
     except Exception as e:
